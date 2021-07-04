@@ -1,19 +1,15 @@
-# wmr
-
-# define kinematic types
-## geometries
-- projective point
-- velocity
-- torque
-
-## algebras
-- twist
-
-## groups
-- group
+# Algebraic Robots
+A small Rust Library for SE3
 
 
+## Supported SE3 concepts:
+- Twist
+- Screw
+- SE3 Group
+- se3 algebra
 
-
-# methods
-- coordinates to lie algebras to groups
+## Future plans:
+- Twist Chains
+- Wrenches
+- Jacobians
+- Visualization
