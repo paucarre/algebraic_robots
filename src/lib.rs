@@ -5,17 +5,7 @@ pub mod algebraic_robots {
     use std::cmp::{PartialOrd};
     use std::f32::consts::PI;
 
-    pub static EPSILLON: f32 = 1e-10;
-
-    pub struct Frame {
-        name: String
-    }
-
-    pub struct Transformation {
-        from_frame: Frame,
-        to_frame  : Frame,
-        twist: Twist,
-    }
+    pub static EPSILLON: f32 = 1e-6;
 
     #[derive(Debug, PartialEq, PartialOrd)]
     pub struct AxisAngleRotation {
@@ -45,7 +35,16 @@ pub mod algebraic_robots {
 
     pub fn log(group: ProjectiveGroupRep) -> ProjectiveAlgebraRep {
         let rotation = group.fixed_slice::<3, 3>(0, 0);
-        let acosinput = (rotation.trace() - 1.0) / 2.0;
+        let acosinput =  {
+            let acosinput_raw = (rotation.trace() - 1.0) / 2.0;
+            if (acosinput_raw + 1.0).abs() < EPSILLON {
+                -1.0
+            } else if (acosinput_raw - 1.0).abs() < EPSILLON {
+                1.0
+            } else {
+                acosinput_raw
+            }
+        };
         let theta = acosinput.acos();
         let so3_algebra = {
             if acosinput >= 1.0 {
@@ -80,8 +79,6 @@ pub mod algebraic_robots {
                 0.0, 0.0, 0.0, 0.0,
             ])
         } else {
-            print!("\n0000234230\n\n");
-
             let so3_algebra_square = so3_algebra * so3_algebra;
             let velocities = (
                                 Matrix3::<f32>::identity() -
@@ -99,57 +96,20 @@ pub mod algebraic_robots {
             ])
         }
     }
-/*
 
- R, p = TransToRp(T)
-    omgmat = MatrixLog3(R)
-    if np.array_equal(omgmat, np.zeros((3, 3))):
-        return np.r_[np.c_[np.zeros((3, 3)),
-                           [T[0][3], T[1][3], T[2][3]]],
-                     [[0, 0, 0, 0]]]
-    else:
-        theta = np.arccos((np.trace(R) - 1) / 2.0)
-        return np.r_[np.c_[omgmat,
-                           np.dot(np.eye(3) - omgmat / 2.0 \
-                           + (1.0 / theta - 1.0 / np.tan(theta / 2.0) / 2) \
-                              * np.dot(omgmat,omgmat) / theta,[T[0][3],
-                                                               T[1][3],
-                                                               T[2][3]])],
-                     [[0, 0, 0, 0]]]
-
-def MatrixLog3(R):
-
-"""Computes the matrix logarithm of a rotation matrix
-:param R: A 3x3 rotation matrix
-:return: The matrix logarithm of R
-Example Input:
-    R = np.array([[0, 0, 1],
-                  [1, 0, 0],
-                  [0, 1, 0]])
-Output:
-    np.array([[          0, -1.20919958,  1.20919958],
-              [ 1.20919958,           0, -1.20919958],
-              [-1.20919958,  1.20919958,           0]])
-"""
-acosinput = (np.trace(R) - 1) / 2.0
-if acosinput >= 1:
-    return np.zeros((3, 3))
-elif acosinput <= -1:
-    if not NearZero(1 + R[2][2]):
-        omg = (1.0 / np.sqrt(2 * (1 + R[2][2]))) \
-              * np.array([R[0][2], R[1][2], 1 + R[2][2]])
-    elif not NearZero(1 + R[1][1]):
-        omg = (1.0 / np.sqrt(2 * (1 + R[1][1]))) \
-              * np.array([R[0][1], 1 + R[1][1], R[2][1]])
-    else:
-        omg = (1.0 / np.sqrt(2 * (1 + R[0][0]))) \
-              * np.array([1 + R[0][0], R[1][0], R[2][0]])
-    return VecToso3(np.pi * omg)
-else:
-    theta = np.arccos(acosinput)
-    return theta / 2.0 / np.sin(theta) * (R - np.array(R).T)
+    pub fn invert(group: ProjectiveGroupRep) -> ProjectiveGroupRep {
+        let rotation = group.fixed_slice::<3, 3>(0, 0);
+        let inverted_rotation = rotation.transpose();
+        let translation = group.fixed_slice::<3, 1>(0, 3);
+        let interted_translation = - inverted_rotation * translation;
+        Matrix4::<f32>::from_row_slice(&[
+            *inverted_rotation.index((0, 0)), *inverted_rotation.index((0, 1)), *inverted_rotation.index((0, 2)), *interted_translation.index((0, 0)),
+            *inverted_rotation.index((1, 0)), *inverted_rotation.index((1, 1)), *inverted_rotation.index((1, 2)), *interted_translation.index((1, 0)),
+            *inverted_rotation.index((2, 0)), *inverted_rotation.index((2, 1)), *inverted_rotation.index((2, 2)), *interted_translation.index((2, 0)),
+            0.0, 0.0, 0.0, 1.0                            ,
+        ])
     }
-*/
+
     pub fn exp(algebra: ProjectiveAlgebraRep) -> ProjectiveGroupRep {
         let twist = algebra.to_twist();
         if twist.angular_velocity.norm() > EPSILLON {
@@ -486,10 +446,10 @@ else:
                 0.0, 0.0, 0.0, 0.0,
             ]);
             let transformation = exp(expected_algebra);
-            //let reconstructed_algebra = log(transformation);
-            //let errors = &( reconstructed_algebra - expected_algebra );
-            //let error = errors.fold(0.0, |sum, element| sum + ( element * element ) );
-            //assert!(error < EPSILLON);
+            let reconstructed_algebra = log(transformation);
+            let errors = &( reconstructed_algebra - expected_algebra );
+            let error = errors.fold(0.0, |sum, element| sum + ( element * element ) );
+            assert!(error < EPSILLON);
         }
 
         #[test]
@@ -504,17 +464,17 @@ else:
             );
             let expected_algebra = twist.to_algebra();
             let transformation = exp(expected_algebra);
-            //let reconstructed_algebra = log(transformation);
-            //let errors = &( reconstructed_algebra - expected_algebra );
-            //let error = errors.fold(0.0, |sum, element| sum + ( element * element ) );
-            //assert!(error < EPSILLON);
+            let reconstructed_algebra = log(transformation);
+            let errors = &( reconstructed_algebra - expected_algebra );
+            let error = errors.fold(0.0, |sum, element| sum + ( element * element ) );
+            assert!(error < EPSILLON);
         }
 
         #[test]
         fn test_log_angle_axis_velocity_second() {
             let angle_axis_rotation = AxisAngleRotation {
                 axis: Unit::new_normalize(Vector3::new(2.0, 0.0, 1.0)).into_inner(),
-                angle: PI * 3.0
+                angle: PI * 1.0
             };
             let twist = Twist::from_axis_angle_and_velocities(
                 &angle_axis_rotation,
@@ -525,10 +485,44 @@ else:
             let reconstructed_algebra = log(transformation);
             let errors = &( reconstructed_algebra - expected_algebra );
             let error = errors.fold(0.0, |sum, element| sum + ( element * element ) );
-            print!("\n\ngroup {:?}\n\n" , transformation);
-            print!("\n\nerror {:?}\n\n" , error);
-            print!("\n\nrecon {:?}\n\n" , reconstructed_algebra);
-            print!("\n\nexpec {:?}\n\n" , expected_algebra);
+            assert!(error < EPSILLON);
+        }
+
+        #[test]
+        fn test_log_angle_axis_velocity_third() {
+            let angle_axis_rotation = AxisAngleRotation {
+                axis: Unit::new_normalize(Vector3::new(1.0, 0.0, 0.0)).into_inner(),
+                angle: PI * 2.0
+            };
+            let twist = Twist::from_axis_angle_and_velocities(
+                &angle_axis_rotation,
+                &(Vector3::new(0.0, 0.0, 0.0))
+            );
+            let expected_algebra = twist.to_algebra();
+            let transformation = exp(expected_algebra);
+            let reconstructed_algebra = log(transformation);
+            let transformation_reconstructed = exp(reconstructed_algebra);
+            let transform = invert(transformation_reconstructed) * transformation;
+            let errors = &( transform - Matrix4::<f32>::identity() );
+            let error = errors.fold(0.0, |sum, element| sum + ( element * element ) );
+            assert!(error < EPSILLON);
+        }
+
+        #[test]
+        fn test_invert() {
+            let angle_axis_rotation = AxisAngleRotation {
+                axis: Unit::new_normalize(Vector3::new(1.0, 3.0, 1.0)).into_inner(),
+                angle: PI * 1.6
+            };
+            let twist = Twist::from_axis_angle_and_velocities(
+                &angle_axis_rotation,
+                &(Vector3::new(40.0, 10.0, -80.0))
+            );
+            let expected_algebra = twist.to_algebra();
+            let transformation = exp(expected_algebra);
+            let transform = invert(transformation) * transformation;
+            let errors = &( transform - Matrix4::<f32>::identity() );
+            let error = errors.fold(0.0, |sum, element| sum + ( element * element ) );
             assert!(error < EPSILLON);
         }
 
