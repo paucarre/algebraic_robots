@@ -41,6 +41,67 @@ pub mod algebraic_robots {
     pub trait SE3Algebra {
         fn to_twist(&self) -> Twist;
     }
+        /*
+
+    pub fn log(group: ProjectiveGroupRep) -> ProjectiveAlgebraRep {
+        let rotation = group.fixed_slice::<3, 3>(0, 0);
+        let group_so3 = {
+            let acos = (rotation.trace() - 1.0) / 2.0;
+            if acos >= 1.0 {
+                Matrix3::<f32>::zeros()
+            } else if acos <= -1.0 {
+                let omg = {
+                    if  (1.0 + rotation.index((2, 2))).abs() > EPSILLON {
+                        (1.0 / np.sqrt(2 * (1.0 + rotation.index((2, 2)))))
+                            * np.array([rotation.index((0, 2), rotation.index((1,2), 1 + rotation.index((2][2]])
+                    } else if (1.0 + rotation.index((1, 1))).abs() > EPSILLON {
+                        (1.0 / np.sqrt(2 * (1 + R[1][1]))) \
+                            * np.array([R[0][1], 1 + R[1][1], R[2][1]])
+                    } else {
+                        (1.0 / np.sqrt(2 * (1 + R[0][0]))) \
+                            * np.array([1 + R[0][0], R[1][0], R[2][0]])
+                    }
+                }
+                VecToso3(PI * omg)
+            } else {
+                let theta = acos.arccos();
+                theta / 2.0 / np.sin(theta) * (R - np.array(R).T)
+            }
+        };
+
+def MatrixLog3(R):
+
+"""Computes the matrix logarithm of a rotation matrix
+:param R: A 3x3 rotation matrix
+:return: The matrix logarithm of R
+Example Input:
+    R = np.array([[0, 0, 1],
+                  [1, 0, 0],
+                  [0, 1, 0]])
+Output:
+    np.array([[          0, -1.20919958,  1.20919958],
+              [ 1.20919958,           0, -1.20919958],
+              [-1.20919958,  1.20919958,           0]])
+"""
+acosinput = (np.trace(R) - 1) / 2.0
+if acosinput >= 1:
+    return np.zeros((3, 3))
+elif acosinput <= -1:
+    if not NearZero(1 + R[2][2]):
+        omg = (1.0 / np.sqrt(2 * (1 + R[2][2]))) \
+              * np.array([R[0][2], R[1][2], 1 + R[2][2]])
+    elif not NearZero(1 + R[1][1]):
+        omg = (1.0 / np.sqrt(2 * (1 + R[1][1]))) \
+              * np.array([R[0][1], 1 + R[1][1], R[2][1]])
+    else:
+        omg = (1.0 / np.sqrt(2 * (1 + R[0][0]))) \
+              * np.array([1 + R[0][0], R[1][0], R[2][0]])
+    return VecToso3(np.pi * omg)
+else:
+    theta = np.arccos(acosinput)
+    return theta / 2.0 / np.sin(theta) * (R - np.array(R).T)
+    }
+*/
 
     pub fn exp(algebra: ProjectiveAlgebraRep) -> ProjectiveGroupRep {
         let twist = algebra.to_twist();
@@ -245,7 +306,7 @@ pub mod algebraic_robots {
                 &Vector3::new(0.0, 0.0, 0.0)
             );
             let algebra = twist.to_algebra();
-            let transformation = exp(algebra);
+            let transformation = algebra.exp();
             let expected_transformation = Matrix4::<f32>::from_row_slice(&[
                 1.0, 0.0, 0.0, 0.0,
                 0.0, angle_axis_rotation.angle.cos(), -angle_axis_rotation.angle.sin(), 0.0,
@@ -268,7 +329,7 @@ pub mod algebraic_robots {
                 &Vector3::new(0.0, 0.0, 0.0)
             );
             let algebra = twist.to_algebra();
-            let transformation = exp(algebra);
+            let transformation = algebra.exp();
             let expected_transformation = Matrix4::<f32>::from_row_slice(&[
                 angle_axis_rotation.angle.cos(), 0.0, angle_axis_rotation.angle.sin(), 0.0,
                 0.0, 1.0, 0.0, 0.0,
@@ -291,7 +352,7 @@ pub mod algebraic_robots {
                 &Vector3::new(0.0, 0.0, 0.0)
             );
             let algebra = twist.to_algebra();
-            let transformation = exp(algebra);
+            let transformation = algebra.exp();
             let expected_transformation = Matrix4::<f32>::from_row_slice(&[
                 angle_axis_rotation.angle.cos(), -angle_axis_rotation.angle.sin(), 0.0, 0.0,
                 angle_axis_rotation.angle.sin(), angle_axis_rotation.angle.cos(), 0.0, 0.0,
@@ -314,7 +375,7 @@ pub mod algebraic_robots {
                 &(Vector3::new(1.0, 0.0, 0.0))
             );
             let algebra = twist.to_algebra();
-            let transformation = exp(algebra);
+            let transformation = algebra.exp();
             let expected_transformation = Matrix4::<f32>::from_row_slice(&[
                 angle_axis_rotation.angle.cos(), -angle_axis_rotation.angle.sin(), 0.0,  2.0,
                 angle_axis_rotation.angle.sin(),  angle_axis_rotation.angle.cos(), 0.0,  0.0,
@@ -337,7 +398,7 @@ pub mod algebraic_robots {
                 &(Vector3::new(0.0, -1.0, 0.0) * PI)
             );
             let algebra = twist.to_algebra();
-            let transformation = exp(algebra);
+            let transformation = algebra.exp();
             let expected_transformation = Matrix4::<f32>::from_row_slice(&[
                 angle_axis_rotation.angle.cos(), -angle_axis_rotation.angle.sin(), 0.0,  2.0,
                 angle_axis_rotation.angle.sin(),  angle_axis_rotation.angle.cos(), 0.0,  0.0,
@@ -363,7 +424,7 @@ pub mod algebraic_robots {
                 0.0, 1.0,  0.0, 3.0,
                 0.0, 0.0, 0.0,  1.0,
             ]);
-            let transformation = exp(algebra);
+            let transformation = algebra.exp();
             let errors = &( transformation - expected_transformation );
             let error = errors.fold(0.0, |sum, element| sum + ( element * element ) );
             assert!(error < EPSILLON);
