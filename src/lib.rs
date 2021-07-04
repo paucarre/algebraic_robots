@@ -1,11 +1,8 @@
 
 pub mod algebraic_robots {
 
-    use nalgebra::{Matrix, Matrix3x4, Vector3, Vector6, Matrix4, Matrix3, Matrix6, UnitQuaternion, UnitDualQuaternion, Unit};
-    use nalgebra::{DMatrix, DMatrixSlice, DMatrixSliceMut, MatrixSlice, MatrixSliceMut, Translation3, RealField};
-    use nalgebra::{U1, U3, U4, VectorSlice3, ArrayStorage, SliceStorage, Const};
-    use std::cmp::{Ordering, PartialOrd};
-    use std::f32::consts::PI;
+    use nalgebra::{Vector3, Matrix4, Matrix3, Matrix6, Unit};
+    use std::cmp::{PartialOrd};
 
     pub static EPSILLON: f32 = 1e-10;
 
@@ -165,6 +162,7 @@ pub mod algebraic_robots {
         use super::*;
         use { EPSILLON, AxisAngleRotation, Twist, SE3Algebra };
         use nalgebra::{ Unit, Vector3 };
+        use std::f32::consts::PI;
 
         #[test]
         fn test_to_algebra() {
