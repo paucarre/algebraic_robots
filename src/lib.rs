@@ -14,11 +14,17 @@ pub mod algebraic_robots {
         pub angle: f32
     }
 
-    pub type Twist = Vector6<f32>;
-    pub type Screw = Vector6<f32>;
+    pub type Twist  = Vector6<f32>;
+    pub type Screw  = Vector6<f32>;
+    pub type Wrench = Vector6<f32>;
     pub type ProjectiveAlgebraRep = Matrix4<f32>;
     pub type ProjectiveGroupRep   = Matrix4<f32>;
     pub type ProjectiveAdjointRep = Matrix6<f32>;
+
+    pub struct ScrewChain<'a> {
+        pub screws: &'a[Screw],
+        pub end_effector_at_initial_position: ProjectiveGroupRep,
+    }
 
     pub trait SE3Algebra {
         fn to_twist(&self) -> Twist;
@@ -47,6 +53,41 @@ pub mod algebraic_robots {
         fn to_axis_angle_rotation(&self) -> AxisAngleRotation;
         fn to_algebra(&self) -> ProjectiveAlgebraRep;
         fn to_screw(&self) -> Screw;
+    }
+
+    pub trait WrenchLike {
+        fn from_point_and_force(point: Vector3<f32>, force: Vector3<f32>) -> Wrench;
+        fn from_moment_and_force(moment: Vector3<f32>, force: Vector3<f32>) -> Wrench;
+    }
+
+
+    impl ScrewChain<'_> {
+
+        pub fn to_transform(&self, coordinates : &[f32]) -> Option<ProjectiveGroupRep> {
+            if coordinates.len() == self.screws.len() {
+                let transform_screws = self.screws.iter().zip(coordinates.iter()).
+                    fold( Matrix4::identity(),
+                        | current_transform : Matrix4<f32>, (&screw, &coordinate) |
+                        current_transform * ( (screw * coordinate).to_algebra().exponential() ));
+                return Option::Some(transform_screws * self.end_effector_at_initial_position )
+            } else {
+                return Option::None
+            }
+
+        }
+
+    }
+
+    impl WrenchLike for Wrench {
+
+        fn from_point_and_force(point: Vector3<f32>, force: Vector3<f32>) -> Wrench {
+            Vector6::<f32>::from_row_slice( &[ point.cross(&force).as_slice(), force.as_slice() ].concat() )
+        }
+
+        fn from_moment_and_force(moment: Vector3<f32>, force: Vector3<f32>) -> Wrench {
+            Vector6::<f32>::from_row_slice( &[ moment.as_slice(), force.as_slice() ].concat() )
+        }
+
     }
 
     impl GeneralizedCoordinates for Vector6<f32> {
@@ -133,7 +174,7 @@ pub mod algebraic_robots {
                 ])
             } else {
                 let so3_algebra_square = so3_algebra * so3_algebra;
-                let velocities = (
+                let t3_algebra = (
                                     Matrix3::<f32>::identity() -
                                     ( so3_algebra / 2.0 ) +
                                     (
@@ -142,9 +183,9 @@ pub mod algebraic_robots {
                                     ) * ( so3_algebra_square / theta )
                                 ) * self.fixed_slice::<3,1>(0, 3);
                 Matrix4::<f32>::from_row_slice(&[
-                    *so3_algebra.index((0, 0)), *so3_algebra.index((0, 1)), *so3_algebra.index((0, 2)), *velocities.index((0, 0)),
-                    *so3_algebra.index((1, 0)), *so3_algebra.index((1, 1)), *so3_algebra.index((1, 2)), *velocities.index((1, 0)),
-                    *so3_algebra.index((2, 0)), *so3_algebra.index((2, 1)), *so3_algebra.index((2, 2)), *velocities.index((2, 0)),
+                    *so3_algebra.index((0, 0)), *so3_algebra.index((0, 1)), *so3_algebra.index((0, 2)), *t3_algebra.index((0, 0)),
+                    *so3_algebra.index((1, 0)), *so3_algebra.index((1, 1)), *so3_algebra.index((1, 2)), *t3_algebra.index((1, 0)),
+                    *so3_algebra.index((2, 0)), *so3_algebra.index((2, 1)), *so3_algebra.index((2, 2)), *t3_algebra.index((2, 0)),
                                            0.0,                        0.0,                        0.0,                       0.0,
                 ])
             }
@@ -251,10 +292,10 @@ pub mod algebraic_robots {
             let angular_velocity = self.angular();
             let linear_velocity = self.linear();
             Matrix4::<f32>::from_row_slice(&[
-                    0.0                      , -angular_velocity[2],  angular_velocity[1], linear_velocity[0],
-                    angular_velocity[2] , 0.0                      , -angular_velocity[0], linear_velocity[1],
-                    -angular_velocity[1], angular_velocity[0] ,  0.0                     , linear_velocity[2],
-                    0.0                      , 0.0                      ,  0.0                     , 0.0                           ,
+                                     0.0, -angular_velocity[2],  angular_velocity[1], linear_velocity[0],
+                     angular_velocity[2],                  0.0, -angular_velocity[0], linear_velocity[1],
+                    -angular_velocity[1],  angular_velocity[0],                  0.0, linear_velocity[2],
+                                     0.0,                  0.0,                  0.0,                0.0,
                 ])
         }
 
@@ -603,6 +644,49 @@ pub mod algebraic_robots {
             let twist_squared_computed = adjoint_transformation * twist;
             let expected_twist = (transformation * algebra * transformation.invert()).to_twist();
             let errors = &( twist_squared_computed - expected_twist );
+            let error = errors.fold(0.0, |sum, element| sum + ( element * element ) );
+            assert!(error < EPSILLON);
+        }
+
+        #[test]
+        fn test_screw_chain() {
+            let h1 =  89.0 / 1000.0;
+            let h2 =  95.0 / 1000.0;
+            let l1 = 425.0 / 1000.0;
+            let l2 = 392.0 / 1000.0;
+            let w1 = 109.0 / 1000.0;
+            let w2 =  82.0 / 1000.0;
+            let screw_1 = Screw::from_angular_linear(
+                Vector3::new(0.0, 0.0, 1.0), Vector3::new(0.0, 0.0, 0.0));
+            let screw_2 = Screw::from_angular_linear(
+                Vector3::new(0.0, 1.0, 0.0), Vector3::new(-h1, 0.0, 0.0));
+            let screw_3 = Screw::from_angular_linear(
+                Vector3::new(0.0, 1.0, 0.0), Vector3::new(-h1, 0.0, l1));
+            let screw_4 = Screw::from_angular_linear(
+                Vector3::new(0.0, 1.0, 0.0), Vector3::new(-h1, 0.0, l1 + l2));
+            let screw_5 = Screw::from_angular_linear(
+                Vector3::new(0.0, 0.0, -1.0), Vector3::new(-w1, l1 + l2, 0.0));
+            let screw_6 = Screw::from_angular_linear(
+                Vector3::new(0.0, 1.0, 0.0), Vector3::new(h2 - h1, 0.0, l1 + l2));
+            let end_effector_at_initial_position = Matrix4::<f32>::from_row_slice(&[
+               -1.0, 0.0, 0.0, l1 + l2,
+                0.0, 0.0, 1.0, w1 + w2,
+                0.0, 1.0, 0.0, h1 - h2,
+                0.0, 0.0, 0.0,     1.0,
+            ]);
+            let coordinates = &[0.0, -PI / 2., 0.0, 0.0, PI / 2.0, 0.0];
+            let universal_robots_ur5 = ScrewChain {
+                screws: &[screw_1, screw_2, screw_3, screw_4, screw_5, screw_6],
+                end_effector_at_initial_position: end_effector_at_initial_position
+            };
+            let transformation = universal_robots_ur5.to_transform(coordinates).unwrap();
+            let expectd_transformation = Matrix4::<f32>::from_row_slice(&[
+                0.0, -1.0, 0.0, 0.095,
+                1.0,  0.0, 0.0, 0.109,
+                0.0,  0.0, 1.0, 0.988,
+                0.0,  0.0, 0.0, 1.0,
+            ]);
+            let errors = &( transformation - expectd_transformation );
             let error = errors.fold(0.0, |sum, element| sum + ( element * element ) );
             assert!(error < EPSILLON);
         }
