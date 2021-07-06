@@ -1,7 +1,7 @@
 
 pub mod algebraic_robots {
 
-    use nalgebra::{Vector3, Vector6, Matrix4, U1, U3, U6, VectorSlice3, VectorSlice6, Matrix, SliceStorage, Matrix3, Matrix6, Unit};
+    use nalgebra::{Vector3, Vector6, Matrix4, U1, U3, U6, Matrix, SliceStorage, Matrix3, Matrix6, Unit};
     use std::cmp::{PartialOrd};
     use std::f32::consts::PI;
 
@@ -17,7 +17,7 @@ pub mod algebraic_robots {
     pub type Twist = Vector6<f32>;
     pub type Screw = Vector6<f32>;
     pub type ProjectiveAlgebraRep = Matrix4<f32>;
-    pub type ProjectiveGroupRep = Matrix4<f32>;
+    pub type ProjectiveGroupRep   = Matrix4<f32>;
     pub type ProjectiveAdjointRep = Matrix6<f32>;
 
     pub trait SE3Algebra {
@@ -35,6 +35,18 @@ pub mod algebraic_robots {
         fn angular(&self) -> Vector3Slice<f32>;
         fn linear(&self)  -> Vector3Slice<f32>;
         fn from_angular_linear(angular : Vector3<f32>, linear : Vector3<f32>) -> Vector6<f32>;
+    }
+
+    pub trait TwistLike {
+        fn from_axis_angle_and_position_rotation(
+            axis_angle_rotation: &AxisAngleRotation,
+            axis_point: &Vector3<f32>) -> Twist;
+        fn from_axis_angle_and_velocities(
+                axis_angle_rotation: &AxisAngleRotation,
+                linear_velocity: &Vector3<f32>) -> Twist;
+        fn to_axis_angle_rotation(&self) -> AxisAngleRotation;
+        fn to_algebra(&self) -> ProjectiveAlgebraRep;
+        fn to_screw(&self) -> Screw;
     }
 
     impl GeneralizedCoordinates for Vector6<f32> {
@@ -105,7 +117,7 @@ pub mod algebraic_robots {
                     };
                     Matrix3::<f32>::from_row_slice(&[
                             0.0, -omg[2],  omg[1],
-                        omg[2],     0.0, -omg[0],
+                         omg[2],     0.0, -omg[0],
                         -omg[1],  omg[0],     0.0
                     ]) * PI
                 } else {
@@ -178,7 +190,7 @@ pub mod algebraic_robots {
                     *so3_group.index((0, 0)), *so3_group.index((0, 1)), *so3_group.index((0, 2)), *t3_group.index((0, 0)),
                     *so3_group.index((1, 0)), *so3_group.index((1, 1)), *so3_group.index((1, 2)), *t3_group.index((1, 0)),
                     *so3_group.index((2, 0)), *so3_group.index((2, 1)), *so3_group.index((2, 2)), *t3_group.index((2, 0)),
-                    0.0, 0.0, 0.0, 1.0                            ,
+                                         0.0,                      0.0,                      0.0,                     1.0,
                 ])
             } else {
                 let linear_velocity = twist.linear();
@@ -186,7 +198,7 @@ pub mod algebraic_robots {
                         1.0, 0.0, 0.0, linear_velocity[0],
                         0.0, 1.0, 0.0, linear_velocity[1],
                         0.0, 0.0, 1.0, linear_velocity[2],
-                        0.0, 0.0, 0.0, 1.0                            ,
+                        0.0, 0.0, 0.0,                1.0,
                     ])
 
             }
@@ -195,29 +207,13 @@ pub mod algebraic_robots {
 
         fn to_twist(&self) -> Twist {
             Twist::from_angular_linear(
-                Vector3::new(
-                    *self.index((2, 1)),
-                    *self.index((0, 2)),
-                    *self.index((1, 0))),
-                Vector3::new(
-                    *self.index((0, 3)),
-                    *self.index((1, 3)),
-                    *self.index((2, 3)))
+                    Vector3::new( *self.index((2, 1)), *self.index((0, 2)), *self.index((1, 0)) ),
+                    Vector3::new( *self.index((0, 3)), *self.index((1, 3)), *self.index((2, 3)) )
                 )
         }
     }
 
-    pub trait TwistLike {
-        fn from_axis_angle_and_position_rotation(
-            axis_angle_rotation: &AxisAngleRotation,
-            axis_point: &Vector3<f32>) -> Twist;
-        fn from_axis_angle_and_velocities(
-                axis_angle_rotation: &AxisAngleRotation,
-                linear_velocity: &Vector3<f32>) -> Twist;
-        fn to_axis_angle_rotation(&self) -> AxisAngleRotation;
-        fn to_algebra(&self) -> ProjectiveAlgebraRep;
-        fn to_screw(&self) -> Screw;
-    }
+
 
     impl TwistLike for Twist {
 
@@ -272,11 +268,11 @@ pub mod algebraic_robots {
                      linear_velocity / angle
                 )
             } else {
-                let translation = linear_velocity.norm();
-                if translation > EPSILLON {
+                let linear_velocity_norm = linear_velocity.norm();
+                if linear_velocity_norm > EPSILLON {
                     Screw::from_angular_linear(
                         Vector3::new(0.0, 0.0, 0.0),
-                        linear_velocity / translation
+                        linear_velocity / linear_velocity_norm
                     )
                 } else {
                     Screw::from_angular_linear(
@@ -309,10 +305,10 @@ pub mod algebraic_robots {
             let angle = 1.0 / 3.0f32.sqrt();
             let algebra = twist.to_algebra();
             let expected_algebra =  Matrix4::<f32>::from_row_slice(&[
-                0.0, -angle,  angle, 20.0,
-                angle, 0.0, -angle, 30.0,
-                -angle, angle,  0.0, 40.0,
-                0.0, 0.0,  0.0, 0.0,
+                   0.0, -angle,  angle, 20.0,
+                 angle,    0.0, -angle, 30.0,
+                -angle,  angle,    0.0, 40.0,
+                   0.0,    0.0,    0.0,  0.0,
             ]);
             assert_eq!(algebra, expected_algebra);
         }
@@ -359,10 +355,10 @@ pub mod algebraic_robots {
             let algebra = twist.to_algebra();
             let transformation = algebra.exponential();
             let expected_transformation = Matrix4::<f32>::from_row_slice(&[
-                1.0, 0.0, 0.0, 20.0,
+                1.0, 0.0, 0.0,  20.0,
                 0.0, 1.0, 0.0, -30.0,
-                0.0, 0.0, 1.0, 40.0,
-                0.0, 0.0, 0.0, 1.0                            ,
+                0.0, 0.0, 1.0,  40.0,
+                0.0, 0.0, 0.0,   1.0,
             ]);
             assert_eq!(transformation, expected_transformation);
         }
@@ -427,7 +423,7 @@ pub mod algebraic_robots {
             let transformation = algebra.exponential();
             let expected_transformation = Matrix4::<f32>::from_row_slice(&[
                 angle_axis_rotation.angle.cos(), -angle_axis_rotation.angle.sin(), 0.0, 0.0,
-                angle_axis_rotation.angle.sin(), angle_axis_rotation.angle.cos(), 0.0, 0.0,
+                angle_axis_rotation.angle.sin(),  angle_axis_rotation.angle.cos(), 0.0, 0.0,
                 0.0, 0.0, 1.0, 0.0,
                 0.0, 0.0, 0.0, 1.0                            ,
             ]);
@@ -592,19 +588,21 @@ pub mod algebraic_robots {
         }
 
         #[test]
-        fn test_adjoint() {
+        fn test_adjoint_is_equal_to_algebra_left_multiplied_and_inverse_right_multiplied() {
             let angle_axis_rotation = AxisAngleRotation {
-                axis: Unit::new_normalize(Vector3::new(1.0, 3.0, 1.0)).into_inner(),
-                angle: PI * 1.6
+                axis: Unit::new_normalize(Vector3::new(2.0, 1.0, 1.0)).into_inner(),
+                angle: 1.6
             };
             let twist = Twist::from_axis_angle_and_velocities(
                 &angle_axis_rotation,
-                &(Vector3::new(40.0, 10.0, -80.0))
+                &(Vector3::new(10.0, -20.0, 80.0))
             );
-            let expected_algebra = twist.to_algebra();
-            let transformation = expected_algebra.exponential();
-            let transform = transformation.invert() * transformation;
-            let errors = &( transform - Matrix4::<f32>::identity() );
+            let algebra = twist.to_algebra();
+            let transformation = algebra.exponential();
+            let adjoint_transformation = transformation.to_adjoint();
+            let twist_squared_computed = adjoint_transformation * twist;
+            let expected_twist = (transformation * algebra * transformation.invert()).to_twist();
+            let errors = &( twist_squared_computed - expected_twist );
             let error = errors.fold(0.0, |sum, element| sum + ( element * element ) );
             assert!(error < EPSILLON);
         }
