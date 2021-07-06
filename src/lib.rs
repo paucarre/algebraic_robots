@@ -1,11 +1,12 @@
 
 pub mod algebraic_robots {
 
-    use nalgebra::{Vector3, Matrix4, Matrix3, Matrix6, Unit};
+    use nalgebra::{Vector3, Vector6, Matrix4, U1, U3, U6, VectorSlice3, VectorSlice6, Matrix, SliceStorage, Matrix3, Matrix6, Unit};
     use std::cmp::{PartialOrd};
     use std::f32::consts::PI;
 
     pub static EPSILLON: f32 = 1e-6;
+    pub type Vector3Slice<'a, T, RStride = U1, CStride = U6> = Matrix<T, U3, U1, SliceStorage<'a, T, U3, U1, RStride, CStride>>;
 
     #[derive(Debug, PartialEq, PartialOrd)]
     pub struct AxisAngleRotation {
@@ -13,18 +14,8 @@ pub mod algebraic_robots {
         pub angle: f32
     }
 
-    #[derive(Debug, PartialEq, PartialOrd)]
-    pub struct Twist {
-        angular_velocity: Vector3<f32>,
-        translational_velocity: Vector3<f32>,
-    }
-
-    #[derive(Debug, PartialEq, PartialOrd)]
-    pub struct Screw {
-        angular_velocity_axis: Vector3<f32>,
-        translational_velocity_axis: Vector3<f32>,
-    }
-
+    pub type Twist = Vector6<f32>;
+    pub type Screw = Vector6<f32>;
     pub type ProjectiveAlgebraRep = Matrix4<f32>;
     pub type ProjectiveGroupRep = Matrix4<f32>;
     pub type ProjectiveAdjointRep = Matrix6<f32>;
@@ -38,6 +29,28 @@ pub mod algebraic_robots {
         fn invert(&self) -> ProjectiveGroupRep;
         fn logarithm(&self) -> ProjectiveAlgebraRep;
         fn to_adjoint(&self) -> ProjectiveAdjointRep;
+    }
+
+    pub trait GeneralizedCoordinates {
+        fn angular(&self) -> Vector3Slice<f32>;
+        fn linear(&self)  -> Vector3Slice<f32>;
+        fn from_angular_linear(angular : Vector3<f32>, linear : Vector3<f32>) -> Vector6<f32>;
+    }
+
+    impl GeneralizedCoordinates for Vector6<f32> {
+
+        fn from_angular_linear(angular : Vector3<f32>, linear : Vector3<f32>) -> Vector6<f32> {
+            Vector6::<f32>::from_row_slice(&[angular.as_slice(), linear.as_slice()].concat())
+        }
+
+        fn angular(&self) -> Vector3Slice<f32> {
+            self.fixed_slice::<3, 1>(0, 0)
+        }
+
+        fn linear(&self) -> Vector3Slice<f32> {
+            self.fixed_slice::<3, 1>(3, 0)
+        }
+
     }
 
     impl SE3Group for ProjectiveGroupRep {
@@ -146,7 +159,8 @@ pub mod algebraic_robots {
 
         fn exponential(&self) -> ProjectiveGroupRep {
             let twist = self.to_twist();
-            if twist.angular_velocity.norm() > EPSILLON {
+            let angular_velocity = twist.angular();
+            if angular_velocity.norm() > EPSILLON {
                 let axis_angle_rotation = twist.to_axis_angle_rotation();
                 let rotation_algebra = self.fixed_slice::<3, 3>(0, 0);
                 let omgmat = rotation_algebra / axis_angle_rotation.angle;
@@ -167,10 +181,11 @@ pub mod algebraic_robots {
                     0.0, 0.0, 0.0, 1.0                            ,
                 ])
             } else {
+                let linear_velocity = twist.linear();
                 Matrix4::<f32>::from_row_slice(&[
-                        1.0, 0.0, 0.0, twist.translational_velocity[0],
-                        0.0, 1.0, 0.0, twist.translational_velocity[1],
-                        0.0, 0.0, 1.0, twist.translational_velocity[2],
+                        1.0, 0.0, 0.0, linear_velocity[0],
+                        0.0, 1.0, 0.0, linear_velocity[1],
+                        0.0, 0.0, 1.0, linear_velocity[2],
                         0.0, 0.0, 0.0, 1.0                            ,
                     ])
 
@@ -179,78 +194,95 @@ pub mod algebraic_robots {
         }
 
         fn to_twist(&self) -> Twist {
-            Twist {
-                angular_velocity: Vector3::new(
+            Twist::from_angular_linear(
+                Vector3::new(
                     *self.index((2, 1)),
                     *self.index((0, 2)),
                     *self.index((1, 0))),
-                translational_velocity: Vector3::new(
+                Vector3::new(
                     *self.index((0, 3)),
                     *self.index((1, 3)),
                     *self.index((2, 3)))
-            }
+                )
         }
     }
 
+    pub trait TwistLike {
+        fn from_axis_angle_and_position_rotation(
+            axis_angle_rotation: &AxisAngleRotation,
+            axis_point: &Vector3<f32>) -> Twist;
+        fn from_axis_angle_and_velocities(
+                axis_angle_rotation: &AxisAngleRotation,
+                linear_velocity: &Vector3<f32>) -> Twist;
+        fn to_axis_angle_rotation(&self) -> AxisAngleRotation;
+        fn to_algebra(&self) -> ProjectiveAlgebraRep;
+        fn to_screw(&self) -> Screw;
+    }
 
-    impl Twist {
+    impl TwistLike for Twist {
 
-        pub fn from_axis_angle_and_position_rotation(
+        fn from_axis_angle_and_position_rotation(
             axis_angle_rotation: &AxisAngleRotation,
             axis_point: &Vector3<f32>) -> Twist {
             let angular_velocity = axis_angle_rotation.angle * axis_angle_rotation.axis;
-            let translational_velocity = - angular_velocity.cross(axis_point);
-            Twist {
-                angular_velocity: angular_velocity,
-                translational_velocity: translational_velocity
-            }
+            let linear_velocity = - angular_velocity.cross(axis_point);
+            Twist::from_angular_linear(
+                angular_velocity,
+                linear_velocity
+            )
         }
 
-        pub fn from_axis_angle_and_velocities(
+        fn from_axis_angle_and_velocities(
             axis_angle_rotation: &AxisAngleRotation,
-            translational_velocity: &Vector3<f32>) -> Twist {
-            Twist {
-                angular_velocity: axis_angle_rotation.angle * axis_angle_rotation.axis,
-                translational_velocity: *translational_velocity
-            }
+            linear_velocity: &Vector3<f32>) -> Twist {
+            Twist::from_angular_linear(
+                axis_angle_rotation.angle * axis_angle_rotation.axis,
+                *linear_velocity
+            )
         }
 
-        pub fn to_axis_angle_rotation(&self) -> AxisAngleRotation {
-            let angle = self.angular_velocity.norm();
+        fn to_axis_angle_rotation(&self) -> AxisAngleRotation {
+            let angular_velocity = self.angular();
+            let angle = angular_velocity.norm();
             AxisAngleRotation {
-                axis: Unit::new_normalize(self.angular_velocity).into_inner(),
+                axis: Unit::new_normalize(
+                    Vector3::<f32>::from_row_slice(angular_velocity.as_slice())).into_inner(),
                 angle: angle
             }
         }
 
-        pub fn to_algebra(&self) -> ProjectiveAlgebraRep {
+        fn to_algebra(&self) -> ProjectiveAlgebraRep {
+            let angular_velocity = self.angular();
+            let linear_velocity = self.linear();
             Matrix4::<f32>::from_row_slice(&[
-                    0.0                      , -self.angular_velocity[2],  self.angular_velocity[1], self.translational_velocity[0],
-                    self.angular_velocity[2] , 0.0                      , -self.angular_velocity[0], self.translational_velocity[1],
-                    -self.angular_velocity[1], self.angular_velocity[0] ,  0.0                     , self.translational_velocity[2],
+                    0.0                      , -angular_velocity[2],  angular_velocity[1], linear_velocity[0],
+                    angular_velocity[2] , 0.0                      , -angular_velocity[0], linear_velocity[1],
+                    -angular_velocity[1], angular_velocity[0] ,  0.0                     , linear_velocity[2],
                     0.0                      , 0.0                      ,  0.0                     , 0.0                           ,
                 ])
         }
 
-        pub fn to_screw(&self) -> Screw {
-            let angle = self.angular_velocity.norm();
+        fn to_screw(&self) -> Screw {
+            let angular_velocity = self.angular();
+            let linear_velocity = self.linear();
+            let angle = angular_velocity.norm();
             if angle > EPSILLON {
-                Screw {
-                    angular_velocity_axis: self.angular_velocity / angle,
-                    translational_velocity_axis: self.translational_velocity / angle
-                }
+                Screw::from_angular_linear(
+                     angular_velocity / angle,
+                     linear_velocity / angle
+                )
             } else {
-                let translation = self.translational_velocity.norm();
+                let translation = linear_velocity.norm();
                 if translation > EPSILLON {
-                    Screw {
-                        angular_velocity_axis: Vector3::new(0.0, 0.0, 0.0),
-                        translational_velocity_axis: self.translational_velocity / translation
-                    }
+                    Screw::from_angular_linear(
+                        Vector3::new(0.0, 0.0, 0.0),
+                        linear_velocity / translation
+                    )
                 } else {
-                    Screw {
-                        angular_velocity_axis: Vector3::new(0.0, 0.0, 0.0),
-                        translational_velocity_axis: Vector3::new(0.0, 0.0, 0.0)
-                    }
+                    Screw::from_angular_linear(
+                        Vector3::new(0.0, 0.0, 0.0),
+                        Vector3::new(0.0, 0.0, 0.0)
+                    )
                 }
             }
         }
@@ -543,6 +575,24 @@ pub mod algebraic_robots {
 
         #[test]
         fn test_invert() {
+            let angle_axis_rotation = AxisAngleRotation {
+                axis: Unit::new_normalize(Vector3::new(1.0, 3.0, 1.0)).into_inner(),
+                angle: PI * 1.6
+            };
+            let twist = Twist::from_axis_angle_and_velocities(
+                &angle_axis_rotation,
+                &(Vector3::new(40.0, 10.0, -80.0))
+            );
+            let expected_algebra = twist.to_algebra();
+            let transformation = expected_algebra.exponential();
+            let transform = transformation.invert() * transformation;
+            let errors = &( transform - Matrix4::<f32>::identity() );
+            let error = errors.fold(0.0, |sum, element| sum + ( element * element ) );
+            assert!(error < EPSILLON);
+        }
+
+        #[test]
+        fn test_adjoint() {
             let angle_axis_rotation = AxisAngleRotation {
                 axis: Unit::new_normalize(Vector3::new(1.0, 3.0, 1.0)).into_inner(),
                 angle: PI * 1.6
