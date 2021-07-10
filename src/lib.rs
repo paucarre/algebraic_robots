@@ -21,8 +21,8 @@ pub mod algebraic_robots {
     pub type ProjectiveGroupRep   = Matrix4<f32>;
     pub type ProjectiveAdjointRep = Matrix6<f32>;
 
-    pub struct ScrewChain<'a> {
-        pub screws: &'a[Screw],
+    pub struct ScrewChain {
+        pub screws: Vec<Screw>,
         pub end_effector_at_initial_position: ProjectiveGroupRep,
     }
 
@@ -61,7 +61,7 @@ pub mod algebraic_robots {
     }
 
 
-    impl ScrewChain<'_> {
+    impl ScrewChain {
 
         pub fn to_transform(&self, coordinates : &[f32]) -> Option<ProjectiveGroupRep> {
             if coordinates.len() == self.screws.len() {
@@ -70,6 +70,31 @@ pub mod algebraic_robots {
                         | current_transform : Matrix4<f32>, (&screw, &coordinate) |
                         current_transform * ( (screw * coordinate).to_algebra().exponential() ));
                 return Option::Some(transform_screws * self.end_effector_at_initial_position )
+            } else {
+                return Option::None
+            }
+        }
+
+        pub fn to_space_jacobian(&self, coordinates : &[f32]) -> Option<ProjectiveAdjointRep> {
+            if coordinates.len() == self.screws.len() {
+                let transform_screws = self.screws.iter().rev().zip(coordinates.iter().rev()).
+                    fold( Matrix6::identity(),
+                        | current_transform : Matrix6<f32>, (&screw, &coordinate) |
+                        current_transform * ( (screw * coordinate).to_algebra().exponential().to_adjoint() ));
+                return Option::Some(transform_screws)
+            } else {
+                return Option::None
+            }
+
+        }
+
+        pub fn to_body_jacobian_TODO(&self, coordinates : &[f32]) -> Option<ProjectiveAdjointRep> {
+            if coordinates.len() == self.screws.len() {
+                let transform_screws = self.screws.iter().rev().zip(coordinates.iter().rev()).
+                    fold( Matrix6::identity(),
+                        | current_transform : Matrix6<f32>, (&screw, &coordinate) |
+                        current_transform * ( (screw * coordinate).to_algebra().exponential().to_adjoint() ));
+                return Option::Some(transform_screws)
             } else {
                 return Option::None
             }
@@ -170,7 +195,7 @@ pub mod algebraic_robots {
                     0.0, 0.0, 0.0, *self.index((0, 3)),
                     0.0, 0.0, 0.0, *self.index((1, 3)),
                     0.0, 0.0, 0.0, *self.index((2, 3)),
-                    0.0, 0.0, 0.0,                  0.0,
+                    0.0, 0.0, 0.0,                 0.0,
                 ])
             } else {
                 let so3_algebra_square = so3_algebra * so3_algebra;
@@ -326,6 +351,46 @@ pub mod algebraic_robots {
 
     }
 
+    pub mod screw_chains {
+
+        use super::*;
+
+        pub mod universal_robot_ur5 {
+
+            use super::*;
+
+            pub fn create() -> ScrewChain {
+                let h1 =  89.0 / 1000.0;
+                let h2 =  95.0 / 1000.0;
+                let l1 = 425.0 / 1000.0;
+                let l2 = 392.0 / 1000.0;
+                let w1 = 109.0 / 1000.0;
+                let w2 =  82.0 / 1000.0;
+                from_parameters(h1, h2, l1, l2, w1, w2)
+            }
+
+            pub fn from_parameters(h1: f32, h2: f32, l1: f32, l2: f32, w1: f32, w2: f32) -> ScrewChain {
+                ScrewChain {
+                    screws: vec![
+                            Screw::from_angular_linear(  Vector3::new(0.0, 0.0, 1.0), Vector3::new(0.0, 0.0, 0.0)),
+                            Screw::from_angular_linear(  Vector3::new(0.0, 1.0, 0.0), Vector3::new(-h1, 0.0, 0.0)),
+                            Screw::from_angular_linear(  Vector3::new(0.0, 1.0, 0.0), Vector3::new(-h1, 0.0, l1)),
+                            Screw::from_angular_linear(  Vector3::new(0.0, 1.0, 0.0), Vector3::new(-h1, 0.0, l1 + l2)),
+                            Screw::from_angular_linear( Vector3::new(0.0, 0.0, -1.0), Vector3::new(-w1, l1 + l2, 0.0)),
+                            Screw::from_angular_linear(  Vector3::new(0.0, 1.0, 0.0), Vector3::new(h2 - h1, 0.0, l1 + l2))
+                        ],
+                    end_effector_at_initial_position: Matrix4::<f32>::from_row_slice(&[
+                        -1.0, 0.0, 0.0, l1 + l2,
+                         0.0, 0.0, 1.0, w1 + w2,
+                         0.0, 1.0, 0.0, h1 - h2,
+                         0.0, 0.0, 0.0,     1.0,
+                    ])
+                }
+            }
+
+        }
+
+    }
 }
 
 #[cfg(test)]

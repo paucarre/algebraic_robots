@@ -321,35 +321,18 @@ fn test_adjoint_is_equal_to_algebra_left_multiplied_and_inverse_right_multiplied
 
 #[test]
 fn test_screw_chain() {
-    let h1 =  89.0 / 1000.0;
-    let h2 =  95.0 / 1000.0;
-    let l1 = 425.0 / 1000.0;
-    let l2 = 392.0 / 1000.0;
-    let w1 = 109.0 / 1000.0;
-    let w2 =  82.0 / 1000.0;
-    let screw_1 = Screw::from_angular_linear(
-        Vector3::new(0.0, 0.0, 1.0), Vector3::new(0.0, 0.0, 0.0));
-    let screw_2 = Screw::from_angular_linear(
-        Vector3::new(0.0, 1.0, 0.0), Vector3::new(-h1, 0.0, 0.0));
-    let screw_3 = Screw::from_angular_linear(
-        Vector3::new(0.0, 1.0, 0.0), Vector3::new(-h1, 0.0, l1));
-    let screw_4 = Screw::from_angular_linear(
-        Vector3::new(0.0, 1.0, 0.0), Vector3::new(-h1, 0.0, l1 + l2));
-    let screw_5 = Screw::from_angular_linear(
-        Vector3::new(0.0, 0.0, -1.0), Vector3::new(-w1, l1 + l2, 0.0));
-    let screw_6 = Screw::from_angular_linear(
-        Vector3::new(0.0, 1.0, 0.0), Vector3::new(h2 - h1, 0.0, l1 + l2));
-    let end_effector_at_initial_position = Matrix4::<f32>::from_row_slice(&[
-        -1.0, 0.0, 0.0, l1 + l2,
-        0.0, 0.0, 1.0, w1 + w2,
-        0.0, 1.0, 0.0, h1 - h2,
-        0.0, 0.0, 0.0,     1.0,
-    ]);
     let coordinates = &[0.0, -PI / 2., 0.0, 0.0, PI / 2.0, 0.0];
-    let universal_robots_ur5 = ScrewChain {
-        screws: &[screw_1, screw_2, screw_3, screw_4, screw_5, screw_6],
-        end_effector_at_initial_position: end_effector_at_initial_position
-    };
+    let universal_robots_ur5 = screw_chains::universal_robot_ur5::create();
+    let transformation = universal_robots_ur5.to_transform(coordinates).unwrap();
+    let expectd_transformation = Matrix4::<f32>::from_row_slice(&[
+        0.0, -1.0, 0.0, 0.095,
+        1.0,  0.0, 0.0, 0.109,
+        0.0,  0.0, 1.0, 0.988,
+        0.0,  0.0, 0.0, 1.0,
+    ]);
+    let errors = &( transformation - expectd_transformation );
+    let error = errors.fold(0.0, |sum, element| sum + ( element * element ) );
+    assert!(error < EPSILLON);
     let transformation = universal_robots_ur5.to_transform(coordinates).unwrap();
     let expectd_transformation = Matrix4::<f32>::from_row_slice(&[
         0.0, -1.0, 0.0, 0.095,
@@ -361,4 +344,3 @@ fn test_screw_chain() {
     let error = errors.fold(0.0, |sum, element| sum + ( element * element ) );
     assert!(error < EPSILLON);
 }
-
