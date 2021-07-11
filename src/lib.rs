@@ -1,7 +1,7 @@
 
 pub mod algebraic_robots {
 
-    use nalgebra::{Vector3, Vector6, Matrix4, U1, U3, U6, Matrix, SliceStorage, Matrix3, Matrix6, Unit};
+    use nalgebra::{dmatrix, Vector3, Vector6, Matrix4, U1, U3, U6, Matrix, SliceStorage, Matrix3, Matrix6, DMatrix, Unit};
     use std::cmp::{PartialOrd};
     use std::f32::consts::PI;
 
@@ -75,30 +75,35 @@ pub mod algebraic_robots {
             }
         }
 
-        pub fn to_space_jacobian(&self, coordinates : &[f32]) -> Option<ProjectiveAdjointRep> {
-            if coordinates.len() == self.screws.len() {
-                let transform_screws = self.screws.iter().rev().zip(coordinates.iter().rev()).
-                    fold( Matrix6::identity(),
-                        | current_transform : Matrix6<f32>, (&screw, &coordinate) |
-                        current_transform * ( (screw * coordinate).to_algebra().exponential().to_adjoint() ));
-                return Option::Some(transform_screws)
-            } else {
-                return Option::None
-            }
-
+        fn add_transformation(transforms : Vec<Matrix4<f32>>, screw_coordinate: (&Vector6<f32>, &f32) ) -> Vec<Matrix4<f32>> {
+            let (screw, coordinate) = screw_coordinate;
+            let screw_transformation : Matrix4<f32> = (*screw * *coordinate).to_algebra().exponential();
+            let new_transformation : Matrix4<f32> = transforms.last().unwrap() * screw_transformation;
+            let new_transformations = [transforms, vec![new_transformation]].concat();
+            new_transformations
         }
 
-        pub fn to_body_jacobian_TODO(&self, coordinates : &[f32]) -> Option<ProjectiveAdjointRep> {
+        fn add_jacobinan_column(jacobian_columns : Vec<Vector6<f32>>, screw_and_incremental_transformation: (&Vector6<f32>, &Matrix4<f32>) ) -> Vec<Vector6<f32>> {
+            let (screw,_transformation) = screw_and_incremental_transformation;
+            let adjoint_transformation : Matrix6<f32> = _transformation.to_adjoint();
+            let jacobian_column : Vector6<f32> = adjoint_transformation *  screw;
+            let new_jacobian_columns = [jacobian_columns, vec![jacobian_column]].concat();
+            new_jacobian_columns
+        }
+
+        pub fn to_space_jacobian(&self, coordinates : &[f32]) -> Option<DMatrix<f32> > {
             if coordinates.len() == self.screws.len() {
-                let transform_screws = self.screws.iter().rev().zip(coordinates.iter().rev()).
-                    fold( Matrix6::identity(),
-                        | current_transform : Matrix6<f32>, (&screw, &coordinate) |
-                        current_transform * ( (screw * coordinate).to_algebra().exponential().to_adjoint() ));
-                return Option::Some(transform_screws)
+                let screws_and_coordinates = self.screws.iter().zip(coordinates.iter());
+                let identity : Vec<Matrix4<f32>> = vec![Matrix4::identity()];
+                let incremental_transform_screws : Vec<Matrix4<f32>> = screws_and_coordinates.fold(identity, ScrewChain::add_transformation);
+                let screws_and_incremental_transformations = self.screws.iter().zip(incremental_transform_screws.iter());
+                let jacobian_columns : &Vec<Vector6<f32>> = &screws_and_incremental_transformations.fold(vec![], ScrewChain::add_jacobinan_column);
+                let raw_iter = jacobian_columns.into_iter().flat_map(|vector| vector.into_iter()).map(|x| *x).collect::<Vec<_>>();
+                let jacobian_matrix : DMatrix<f32> = DMatrix::from_vec(6, coordinates.len(), raw_iter);
+                return Option::Some(jacobian_matrix)
             } else {
                 return Option::None
             }
-
         }
 
     }
@@ -389,6 +394,65 @@ pub mod algebraic_robots {
             }
 
         }
+
+        pub mod revolute_revolute_prismatic_revolute_revolute_revolute {
+            use super::*;
+
+            pub fn create() -> ScrewChain {
+                let l1 = 1.0;
+                let l2 = 1.0;
+                from_parameters(l1, l2)
+            }
+
+            pub fn from_parameters(l1: f32, l2: f32) -> ScrewChain {
+                ScrewChain {
+                    screws: vec![
+                            Screw::from_angular_linear(  Vector3::new( 0.0, 0.0, 1.0), Vector3::new(0.0, 0.0, 0.0)),
+                            Screw::from_angular_linear(  Vector3::new( 1.0, 0.0, 0.0), Vector3::new(0.0, 0.0, 0.0)),
+                            Screw::from_angular_linear(  Vector3::new( 0.0, 0.0, 0.0), Vector3::new(0.0, 1.0, 0.0)),
+                            Screw::from_angular_linear(  Vector3::new( 0.0, 1.0, 0.0), Vector3::new(0.0, 0.0, 0.0)),
+                            Screw::from_angular_linear( Vector3::new(  1.0, 0.0, 0.0), Vector3::new(0.0, 0.0, -l1)),
+                            Screw::from_angular_linear(  Vector3::new( 0.0, 1.0, 0.0), Vector3::new(0.0, 0.0, 0.0))
+                        ],
+                    end_effector_at_initial_position: Matrix4::<f32>::from_row_slice(&[
+                         1.0, 0.0, 0.0, 0.0,
+                         0.0, 1.0, 0.0, l1 + l2,
+                         0.0, 0.0, 1.0, 0.0,
+                         0.0, 0.0, 0.0, 1.0,
+                    ])
+                }
+            }
+
+        }
+
+        pub mod revolute_revolute_revolute_prismatic {
+            use super::*;
+
+               pub fn create() -> ScrewChain {
+                   let l1 = 1.0;
+                   let l2 = 1.0;
+                   from_parameters(l1, l2)
+               }
+
+               pub fn from_parameters(l1: f32, l2: f32) -> ScrewChain {
+                   ScrewChain {
+                       screws: vec![
+                               Screw::from_angular_linear(  Vector3::new( 0.0, 0.0, 1.0), Vector3::new(0.0, 0.0,  0.0)),
+                               Screw::from_angular_linear(  Vector3::new( 0.0, 0.0, 1.0), Vector3::new(0.0, -l1, 0.0)),
+                               Screw::from_angular_linear(  Vector3::new( 0.0, 0.0, 1.0), Vector3::new(0.0, -l1-l2, 0.0)),
+                               Screw::from_angular_linear(  Vector3::new( 0.0, 0.0, 0.0), Vector3::new(0.0, 0.0, 1.0)),
+                           ],
+                       end_effector_at_initial_position: Matrix4::<f32>::from_row_slice(&[
+                            1.0, 0.0, 0.0, l1 + l2,
+                            0.0, 1.0, 0.0, 0.0,
+                            0.0, 0.0, 1.0, 0.0,
+                            0.0, 0.0, 0.0, 1.0,
+                       ])
+                   }
+               }
+
+           }
+
 
     }
 }

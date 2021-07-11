@@ -2,7 +2,7 @@
 
 use super::*;
 use algebraic_robots::*;
-use nalgebra::{ Unit, Vector3, Matrix4 };
+use nalgebra::{ Unit, Vector3, Matrix4, DMatrix};
 use std::f32::consts::PI;
 
 #[test]
@@ -333,14 +333,39 @@ fn test_screw_chain() {
     let errors = &( transformation - expectd_transformation );
     let error = errors.fold(0.0, |sum, element| sum + ( element * element ) );
     assert!(error < EPSILLON);
-    let transformation = universal_robots_ur5.to_transform(coordinates).unwrap();
+}
+
+
+#[test]
+fn test_screw_chain_revolute_3_prismatic_1() {
+    let coordinates = &[PI / 2.0, -PI, PI / 2.0, 10.0];
+    let revolute_3_prismatic_1 = screw_chains::revolute_revolute_revolute_prismatic::create();
+    let transformation = revolute_3_prismatic_1.to_transform(coordinates).unwrap();
     let expectd_transformation = Matrix4::<f32>::from_row_slice(&[
-        0.0, -1.0, 0.0, 0.095,
-        1.0,  0.0, 0.0, 0.109,
-        0.0,  0.0, 1.0, 0.988,
-        0.0,  0.0, 0.0, 1.0,
-    ]);
+            1.0, 0.0, 0.0,  0.0,
+            0.0, 1.0, 0.0,  0.0,
+            0.0, 0.0, 1.0, 10.0,
+            0.0, 0.0, 0.0,  1.0,
+        ]);
     let errors = &( transformation - expectd_transformation );
+    let error = errors.fold(0.0, |sum, element| sum + ( element * element ) );
+    assert!(error < EPSILLON);
+}
+
+#[test]
+fn test_jacobian_revolute_3_prismatic_1() {
+    let coordinates = &[0.0, 0.0, 0.0, 0.0];
+    let revolute_3_prismatic_1 = screw_chains::revolute_revolute_revolute_prismatic::create();
+    let jacobian = revolute_3_prismatic_1.to_space_jacobian(coordinates).unwrap();
+    let expectd_jacobian = DMatrix::from_row_slice(6, coordinates.len(), &[
+            0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0,
+            1.0, 1.0, 1.0, 0.0,
+            0.0, 0.0, 0.0, 0.0,
+            0.0,-1.0,-2.0, 0.0,
+            0.0, 0.0, 0.0, 1.0,
+        ]);
+    let errors = &( jacobian - expectd_jacobian );
     let error = errors.fold(0.0, |sum, element| sum + ( element * element ) );
     assert!(error < EPSILLON);
 }
