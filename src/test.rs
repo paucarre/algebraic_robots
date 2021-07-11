@@ -3,6 +3,7 @@
 use super::*;
 use algebraic_robots::*;
 use nalgebra::{ Unit, Vector3, Matrix4, DMatrix};
+use screw_chains::{UniversalRobotsUR5, Revolute3Prismatic, ScrewChainLike};
 use std::f32::consts::PI;
 
 #[test]
@@ -322,7 +323,7 @@ fn test_adjoint_is_equal_to_algebra_left_multiplied_and_inverse_right_multiplied
 #[test]
 fn test_screw_chain() {
     let coordinates = &[0.0, -PI / 2., 0.0, 0.0, PI / 2.0, 0.0];
-    let universal_robots_ur5 = screw_chains::universal_robot_ur5::create();
+    let universal_robots_ur5 = UniversalRobotsUR5::from_default().unwrap();
     let transformation = universal_robots_ur5.to_transform(coordinates).unwrap();
     let expectd_transformation = Matrix4::<f32>::from_row_slice(&[
         0.0, -1.0, 0.0, 0.095,
@@ -339,7 +340,7 @@ fn test_screw_chain() {
 #[test]
 fn test_screw_chain_revolute_3_prismatic_1() {
     let coordinates = &[PI / 2.0, -PI, PI / 2.0, 10.0];
-    let revolute_3_prismatic_1 = screw_chains::revolute_revolute_revolute_prismatic::create();
+    let revolute_3_prismatic_1 = Revolute3Prismatic::from_default().unwrap();
     let transformation = revolute_3_prismatic_1.to_transform(coordinates).unwrap();
     let expectd_transformation = Matrix4::<f32>::from_row_slice(&[
             1.0, 0.0, 0.0,  0.0,
@@ -355,7 +356,7 @@ fn test_screw_chain_revolute_3_prismatic_1() {
 #[test]
 fn test_jacobian_revolute_3_prismatic_1() {
     let coordinates = &[0.0, 0.0, 0.0, 0.0];
-    let revolute_3_prismatic_1 = screw_chains::revolute_revolute_revolute_prismatic::create();
+    let revolute_3_prismatic_1 = Revolute3Prismatic::from_default().unwrap();
     let jacobian = revolute_3_prismatic_1.to_space_jacobian(coordinates).unwrap();
     let expectd_jacobian = DMatrix::from_row_slice(6, coordinates.len(), &[
             0.0, 0.0, 0.0, 0.0,

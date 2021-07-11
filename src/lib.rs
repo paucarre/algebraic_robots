@@ -1,7 +1,7 @@
 
 pub mod algebraic_robots {
 
-    use nalgebra::{dmatrix, Vector3, Vector6, Matrix4, U1, U3, U6, Matrix, SliceStorage, Matrix3, Matrix6, DMatrix, Unit};
+    use nalgebra::{Vector3, Vector6, Matrix4, U1, U3, U6, Matrix, SliceStorage, Matrix3, Matrix6, DMatrix, Unit};
     use std::cmp::{PartialOrd};
     use std::f32::consts::PI;
 
@@ -356,106 +356,9 @@ pub mod algebraic_robots {
 
     }
 
-    pub mod screw_chains {
-
-        use super::*;
-
-        pub mod universal_robot_ur5 {
-
-            use super::*;
-
-            pub fn create() -> ScrewChain {
-                let h1 =  89.0 / 1000.0;
-                let h2 =  95.0 / 1000.0;
-                let l1 = 425.0 / 1000.0;
-                let l2 = 392.0 / 1000.0;
-                let w1 = 109.0 / 1000.0;
-                let w2 =  82.0 / 1000.0;
-                from_parameters(h1, h2, l1, l2, w1, w2)
-            }
-
-            pub fn from_parameters(h1: f32, h2: f32, l1: f32, l2: f32, w1: f32, w2: f32) -> ScrewChain {
-                ScrewChain {
-                    screws: vec![
-                            Screw::from_angular_linear(  Vector3::new(0.0, 0.0, 1.0), Vector3::new(0.0, 0.0, 0.0)),
-                            Screw::from_angular_linear(  Vector3::new(0.0, 1.0, 0.0), Vector3::new(-h1, 0.0, 0.0)),
-                            Screw::from_angular_linear(  Vector3::new(0.0, 1.0, 0.0), Vector3::new(-h1, 0.0, l1)),
-                            Screw::from_angular_linear(  Vector3::new(0.0, 1.0, 0.0), Vector3::new(-h1, 0.0, l1 + l2)),
-                            Screw::from_angular_linear( Vector3::new(0.0, 0.0, -1.0), Vector3::new(-w1, l1 + l2, 0.0)),
-                            Screw::from_angular_linear(  Vector3::new(0.0, 1.0, 0.0), Vector3::new(h2 - h1, 0.0, l1 + l2))
-                        ],
-                    end_effector_at_initial_position: Matrix4::<f32>::from_row_slice(&[
-                        -1.0, 0.0, 0.0, l1 + l2,
-                         0.0, 0.0, 1.0, w1 + w2,
-                         0.0, 1.0, 0.0, h1 - h2,
-                         0.0, 0.0, 0.0,     1.0,
-                    ])
-                }
-            }
-
-        }
-
-        pub mod revolute_revolute_prismatic_revolute_revolute_revolute {
-            use super::*;
-
-            pub fn create() -> ScrewChain {
-                let l1 = 1.0;
-                let l2 = 1.0;
-                from_parameters(l1, l2)
-            }
-
-            pub fn from_parameters(l1: f32, l2: f32) -> ScrewChain {
-                ScrewChain {
-                    screws: vec![
-                            Screw::from_angular_linear(  Vector3::new( 0.0, 0.0, 1.0), Vector3::new(0.0, 0.0, 0.0)),
-                            Screw::from_angular_linear(  Vector3::new( 1.0, 0.0, 0.0), Vector3::new(0.0, 0.0, 0.0)),
-                            Screw::from_angular_linear(  Vector3::new( 0.0, 0.0, 0.0), Vector3::new(0.0, 1.0, 0.0)),
-                            Screw::from_angular_linear(  Vector3::new( 0.0, 1.0, 0.0), Vector3::new(0.0, 0.0, 0.0)),
-                            Screw::from_angular_linear( Vector3::new(  1.0, 0.0, 0.0), Vector3::new(0.0, 0.0, -l1)),
-                            Screw::from_angular_linear(  Vector3::new( 0.0, 1.0, 0.0), Vector3::new(0.0, 0.0, 0.0))
-                        ],
-                    end_effector_at_initial_position: Matrix4::<f32>::from_row_slice(&[
-                         1.0, 0.0, 0.0, 0.0,
-                         0.0, 1.0, 0.0, l1 + l2,
-                         0.0, 0.0, 1.0, 0.0,
-                         0.0, 0.0, 0.0, 1.0,
-                    ])
-                }
-            }
-
-        }
-
-        pub mod revolute_revolute_revolute_prismatic {
-            use super::*;
-
-               pub fn create() -> ScrewChain {
-                   let l1 = 1.0;
-                   let l2 = 1.0;
-                   from_parameters(l1, l2)
-               }
-
-               pub fn from_parameters(l1: f32, l2: f32) -> ScrewChain {
-                   ScrewChain {
-                       screws: vec![
-                               Screw::from_angular_linear(  Vector3::new( 0.0, 0.0, 1.0), Vector3::new(0.0, 0.0,  0.0)),
-                               Screw::from_angular_linear(  Vector3::new( 0.0, 0.0, 1.0), Vector3::new(0.0, -l1, 0.0)),
-                               Screw::from_angular_linear(  Vector3::new( 0.0, 0.0, 1.0), Vector3::new(0.0, -l1-l2, 0.0)),
-                               Screw::from_angular_linear(  Vector3::new( 0.0, 0.0, 0.0), Vector3::new(0.0, 0.0, 1.0)),
-                           ],
-                       end_effector_at_initial_position: Matrix4::<f32>::from_row_slice(&[
-                            1.0, 0.0, 0.0, l1 + l2,
-                            0.0, 1.0, 0.0, 0.0,
-                            0.0, 0.0, 1.0, 0.0,
-                            0.0, 0.0, 0.0, 1.0,
-                       ])
-                   }
-               }
-
-           }
-
-
-    }
 }
+
+pub mod screw_chains;
 
 #[cfg(test)]
 mod test;
