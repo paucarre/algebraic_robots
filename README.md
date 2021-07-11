@@ -1,5 +1,5 @@
 # Algebraic Robots
-A small Rust Library for SE3
+A Rust Library for SE3
 
 
 ## Supported:
@@ -8,9 +8,9 @@ A small Rust Library for SE3
 - SE3 Group
 - se3 algebra
 - Adjoint SE3
-- Twist Chains
+- Screw Chains
 - Wrenches
+- Jacobians
 
 ## Future plans:
-- Jacobians
 - Visualization
