@@ -1,5 +1,5 @@
 # Algebraic Robots
-A small Rust Library for SE3
+A Rust Library for SE3
 
 
 ## Supported:
