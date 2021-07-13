@@ -4,9 +4,9 @@ use std::collections::HashMap;
 
 pub trait ScrewChainLike {
     fn from_default() -> Option<ScrewChain>;
-    fn from_parameters(topological_parameters: &HashMap<&str, f32>) -> Option<ScrewChain>;
+    fn from_parameters(topological_parameters: &HashMap<&str, f64>) -> Option<ScrewChain>;
     fn parameters() -> Vec<String>;
-    fn param_map_to_param_vect(parameters_map: &HashMap<&str, f32>) -> Option<Vec<f32>> {
+    fn param_map_to_param_vect(parameters_map: &HashMap<&str, f64>) -> Option<Vec<f64>> {
         let params = Self::parameters();
         let optional_values = params.iter().map(|parameter| parameters_map.get(&parameter.as_str()));
         let empty_vec = Some(vec![]);
@@ -30,7 +30,7 @@ pub struct Revolute3Prismatic;
 impl ScrewChainLike for UniversalRobotsUR5 {
 
     fn from_default() -> Option<ScrewChain> {
-        let default_parameters: HashMap<&str, f32> = [
+        let default_parameters: HashMap<&str, f64> = [
             ("h1", 89.0 / 1000.0),
             ("h2", 95.0 / 1000.0),
             ("l1", 425.0 / 1000.0),
@@ -47,7 +47,7 @@ impl ScrewChainLike for UniversalRobotsUR5 {
                     String::from("w1"), String::from("w2")];
     }
 
-    fn from_parameters(parameters_map: &HashMap<&str, f32>) -> Option<ScrewChain> {
+    fn from_parameters(parameters_map: &HashMap<&str, f64>) -> Option<ScrewChain> {
         let params_opt = Self::param_map_to_param_vect(parameters_map);
         params_opt.map(|params|
             ScrewChain {
@@ -59,7 +59,7 @@ impl ScrewChainLike for UniversalRobotsUR5 {
                         Screw::from_angular_linear( Vector3::new(0.0, 0.0, -1.0), Vector3::new(-params[4], params[2] + params[3], 0.0)),
                         Screw::from_angular_linear(  Vector3::new(0.0, 1.0, 0.0), Vector3::new(params[1] - params[0], 0.0, params[2] + params[3]))
                     ],
-                end_effector_at_initial_position: Matrix4::<f32>::from_row_slice(&[
+                end_effector_at_initial_position: Matrix4::<f64>::from_row_slice(&[
                        -1.0, 0.0, 0.0, params[2] + params[3],
                         0.0, 0.0, 1.0, params[4] + params[5],
                         0.0, 1.0, 0.0, params[0] - params[1],
@@ -73,7 +73,7 @@ impl ScrewChainLike for UniversalRobotsUR5 {
 impl ScrewChainLike for Revolute3PrismaticRevolute3 {
 
     fn from_default() -> Option<ScrewChain> {
-        let default_parameters: HashMap<&str, f32> = [
+        let default_parameters: HashMap<&str, f64> = [
             ("l1", 1.0),
             ("l2", 1.0),
             ].iter().cloned().collect();
@@ -84,7 +84,7 @@ impl ScrewChainLike for Revolute3PrismaticRevolute3 {
         return vec![String::from("l1"), String::from("l2")];
     }
 
-    fn from_parameters(parameters_map: &HashMap<&str, f32>) -> Option<ScrewChain> {
+    fn from_parameters(parameters_map: &HashMap<&str, f64>) -> Option<ScrewChain> {
         let params_opt = Self::param_map_to_param_vect(parameters_map);
         params_opt.map(|params|
             ScrewChain {
@@ -96,7 +96,7 @@ impl ScrewChainLike for Revolute3PrismaticRevolute3 {
                         Screw::from_angular_linear(  Vector3::new( 1.0, 0.0, 0.0), Vector3::new(0.0, 0.0, -params[0])),
                         Screw::from_angular_linear(  Vector3::new( 0.0, 1.0, 0.0), Vector3::new(0.0, 0.0, 0.0))
                     ],
-                end_effector_at_initial_position: Matrix4::<f32>::from_row_slice(&[
+                end_effector_at_initial_position: Matrix4::<f64>::from_row_slice(&[
                         1.0, 0.0, 0.0, 0.0,
                         0.0, 1.0, 0.0, params[0] + params[1],
                         0.0, 0.0, 1.0, 0.0,
@@ -112,7 +112,7 @@ impl ScrewChainLike for Revolute3PrismaticRevolute3 {
 impl ScrewChainLike for Revolute3Prismatic {
 
     fn from_default() -> Option<ScrewChain> {
-        let default_parameters: HashMap<&str, f32> = [
+        let default_parameters: HashMap<&str, f64> = [
             ("l1", 1.0),
             ("l2", 1.0),
             ].iter().cloned().collect();
@@ -123,7 +123,7 @@ impl ScrewChainLike for Revolute3Prismatic {
         return vec![String::from("l1"), String::from("l2")];
     }
 
-    fn from_parameters(parameters_map: &HashMap<&str, f32>) -> Option<ScrewChain> {
+    fn from_parameters(parameters_map: &HashMap<&str, f64>) -> Option<ScrewChain> {
         let params_opt = Self::param_map_to_param_vect(parameters_map);
         params_opt.map(|params|
             ScrewChain {
@@ -133,7 +133,7 @@ impl ScrewChainLike for Revolute3Prismatic {
                         Screw::from_angular_linear(  Vector3::new( 0.0, 0.0, 1.0), Vector3::new(0.0, -params[0]-params[1], 0.0)),
                         Screw::from_angular_linear(  Vector3::new( 0.0, 0.0, 0.0), Vector3::new(0.0, 0.0, 1.0)),
                     ],
-                end_effector_at_initial_position: Matrix4::<f32>::from_row_slice(&[
+                end_effector_at_initial_position: Matrix4::<f64>::from_row_slice(&[
                     1.0, 0.0, 0.0, params[0] + params[1],
                     0.0, 1.0, 0.0, 0.0,
                     0.0, 0.0, 1.0, 0.0,

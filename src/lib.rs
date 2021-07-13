@@ -3,23 +3,23 @@ pub mod algebraic_robots {
 
     use nalgebra::{Vector3, Vector6, Matrix4, U1, U3, U6, Matrix, SliceStorage, Matrix3, Matrix6, DMatrix, Unit};
     use std::cmp::{PartialOrd};
-    use std::f32::consts::PI;
+    use std::f64::consts::PI;
 
-    pub static EPSILLON: f32 = 1e-6;
+    pub static EPSILLON: f64 = 1e-14;
     pub type Vector3Slice<'a, T, RStride = U1, CStride = U6> = Matrix<T, U3, U1, SliceStorage<'a, T, U3, U1, RStride, CStride>>;
 
     #[derive(Debug, PartialEq, PartialOrd)]
     pub struct AxisAngleRotation {
-        pub axis: Vector3<f32>,
-        pub angle: f32
+        pub axis: Vector3<f64>,
+        pub angle: f64
     }
 
-    pub type Twist  = Vector6<f32>;
-    pub type Screw  = Vector6<f32>;
-    pub type Wrench = Vector6<f32>;
-    pub type ProjectiveAlgebraRep = Matrix4<f32>;
-    pub type ProjectiveGroupRep   = Matrix4<f32>;
-    pub type ProjectiveAdjointRep = Matrix6<f32>;
+    pub type Twist  = Vector6<f64>;
+    pub type Screw  = Vector6<f64>;
+    pub type Wrench = Vector6<f64>;
+    pub type ProjectiveAlgebraRep = Matrix4<f64>;
+    pub type ProjectiveGroupRep   = Matrix4<f64>;
+    pub type ProjectiveAdjointRep = Matrix6<f64>;
 
     pub struct ScrewChain {
         pub screws: Vec<Screw>,
@@ -38,36 +38,36 @@ pub mod algebraic_robots {
     }
 
     pub trait GeneralizedCoordinates {
-        fn angular(&self) -> Vector3Slice<f32>;
-        fn linear(&self)  -> Vector3Slice<f32>;
-        fn from_angular_linear(angular : Vector3<f32>, linear : Vector3<f32>) -> Vector6<f32>;
+        fn angular(&self) -> Vector3Slice<f64>;
+        fn linear(&self)  -> Vector3Slice<f64>;
+        fn from_angular_linear(angular : Vector3<f64>, linear : Vector3<f64>) -> Vector6<f64>;
     }
 
     pub trait TwistLike {
         fn from_axis_angle_and_position_rotation(
             axis_angle_rotation: &AxisAngleRotation,
-            axis_point: &Vector3<f32>) -> Twist;
+            axis_point: &Vector3<f64>) -> Twist;
         fn from_axis_angle_and_velocities(
                 axis_angle_rotation: &AxisAngleRotation,
-                linear_velocity: &Vector3<f32>) -> Twist;
+                linear_velocity: &Vector3<f64>) -> Twist;
         fn to_axis_angle_rotation(&self) -> AxisAngleRotation;
         fn to_algebra(&self) -> ProjectiveAlgebraRep;
         fn to_screw(&self) -> Screw;
     }
 
     pub trait WrenchLike {
-        fn from_point_and_force(point: Vector3<f32>, force: Vector3<f32>) -> Wrench;
-        fn from_moment_and_force(moment: Vector3<f32>, force: Vector3<f32>) -> Wrench;
+        fn from_point_and_force(point: Vector3<f64>, force: Vector3<f64>) -> Wrench;
+        fn from_moment_and_force(moment: Vector3<f64>, force: Vector3<f64>) -> Wrench;
     }
 
 
     impl ScrewChain {
 
-        pub fn to_transform(&self, coordinates : &[f32]) -> Option<ProjectiveGroupRep> {
+        pub fn to_transform(&self, coordinates : &[f64]) -> Option<ProjectiveGroupRep> {
             if coordinates.len() == self.screws.len() {
                 let transform_screws = self.screws.iter().zip(coordinates.iter()).
                     fold( Matrix4::identity(),
-                        | current_transform : Matrix4<f32>, (&screw, &coordinate) |
+                        | current_transform : Matrix4<f64>, (&screw, &coordinate) |
                         current_transform * ( (screw * coordinate).to_algebra().exponential() ));
                 return Option::Some(transform_screws * self.end_effector_at_initial_position )
             } else {
@@ -75,31 +75,31 @@ pub mod algebraic_robots {
             }
         }
 
-        fn add_transformation(transforms : Vec<Matrix4<f32>>, screw_coordinate: (&Vector6<f32>, &f32) ) -> Vec<Matrix4<f32>> {
+        fn add_transformation(transforms : Vec<Matrix4<f64>>, screw_coordinate: (&Vector6<f64>, &f64) ) -> Vec<Matrix4<f64>> {
             let (screw, coordinate) = screw_coordinate;
-            let screw_transformation : Matrix4<f32> = (*screw * *coordinate).to_algebra().exponential();
-            let new_transformation : Matrix4<f32> = transforms.last().unwrap() * screw_transformation;
+            let screw_transformation : Matrix4<f64> = (*screw * *coordinate).to_algebra().exponential();
+            let new_transformation : Matrix4<f64> = transforms.last().unwrap() * screw_transformation;
             let new_transformations = [transforms, vec![new_transformation]].concat();
             new_transformations
         }
 
-        fn add_jacobinan_column(jacobian_columns : Vec<Vector6<f32>>, screw_and_incremental_transformation: (&Vector6<f32>, &Matrix4<f32>) ) -> Vec<Vector6<f32>> {
+        fn add_jacobinan_column(jacobian_columns : Vec<Vector6<f64>>, screw_and_incremental_transformation: (&Vector6<f64>, &Matrix4<f64>) ) -> Vec<Vector6<f64>> {
             let (screw,_transformation) = screw_and_incremental_transformation;
-            let adjoint_transformation : Matrix6<f32> = _transformation.to_adjoint();
-            let jacobian_column : Vector6<f32> = adjoint_transformation *  screw;
+            let adjoint_transformation : Matrix6<f64> = _transformation.to_adjoint();
+            let jacobian_column : Vector6<f64> = adjoint_transformation *  screw;
             let new_jacobian_columns = [jacobian_columns, vec![jacobian_column]].concat();
             new_jacobian_columns
         }
 
-        pub fn to_space_jacobian(&self, coordinates : &[f32]) -> Option<DMatrix<f32> > {
+        pub fn to_space_jacobian(&self, coordinates : &[f64]) -> Option<DMatrix<f64> > {
             if coordinates.len() == self.screws.len() {
                 let screws_and_coordinates = self.screws.iter().zip(coordinates.iter());
-                let identity : Vec<Matrix4<f32>> = vec![Matrix4::identity()];
-                let incremental_transform_screws : Vec<Matrix4<f32>> = screws_and_coordinates.fold(identity, ScrewChain::add_transformation);
+                let identity : Vec<Matrix4<f64>> = vec![Matrix4::identity()];
+                let incremental_transform_screws : Vec<Matrix4<f64>> = screws_and_coordinates.fold(identity, ScrewChain::add_transformation);
                 let screws_and_incremental_transformations = self.screws.iter().zip(incremental_transform_screws.iter());
-                let jacobian_columns : &Vec<Vector6<f32>> = &screws_and_incremental_transformations.fold(vec![], ScrewChain::add_jacobinan_column);
+                let jacobian_columns : &Vec<Vector6<f64>> = &screws_and_incremental_transformations.fold(vec![], ScrewChain::add_jacobinan_column);
                 let raw_iter = jacobian_columns.into_iter().flat_map(|vector| vector.into_iter()).map(|x| *x).collect::<Vec<_>>();
-                let jacobian_matrix : DMatrix<f32> = DMatrix::from_vec(6, coordinates.len(), raw_iter);
+                let jacobian_matrix : DMatrix<f64> = DMatrix::from_vec(6, coordinates.len(), raw_iter);
                 return Option::Some(jacobian_matrix)
             } else {
                 return Option::None
@@ -110,27 +110,27 @@ pub mod algebraic_robots {
 
     impl WrenchLike for Wrench {
 
-        fn from_point_and_force(point: Vector3<f32>, force: Vector3<f32>) -> Wrench {
-            Vector6::<f32>::from_row_slice( &[ point.cross(&force).as_slice(), force.as_slice() ].concat() )
+        fn from_point_and_force(point: Vector3<f64>, force: Vector3<f64>) -> Wrench {
+            Vector6::<f64>::from_row_slice( &[ point.cross(&force).as_slice(), force.as_slice() ].concat() )
         }
 
-        fn from_moment_and_force(moment: Vector3<f32>, force: Vector3<f32>) -> Wrench {
-            Vector6::<f32>::from_row_slice( &[ moment.as_slice(), force.as_slice() ].concat() )
+        fn from_moment_and_force(moment: Vector3<f64>, force: Vector3<f64>) -> Wrench {
+            Vector6::<f64>::from_row_slice( &[ moment.as_slice(), force.as_slice() ].concat() )
         }
 
     }
 
-    impl GeneralizedCoordinates for Vector6<f32> {
+    impl GeneralizedCoordinates for Vector6<f64> {
 
-        fn from_angular_linear(angular : Vector3<f32>, linear : Vector3<f32>) -> Vector6<f32> {
-            Vector6::<f32>::from_row_slice(&[angular.as_slice(), linear.as_slice()].concat())
+        fn from_angular_linear(angular : Vector3<f64>, linear : Vector3<f64>) -> Vector6<f64> {
+            Vector6::<f64>::from_row_slice(&[angular.as_slice(), linear.as_slice()].concat())
         }
 
-        fn angular(&self) -> Vector3Slice<f32> {
+        fn angular(&self) -> Vector3Slice<f64> {
             self.fixed_slice::<3, 1>(0, 0)
         }
 
-        fn linear(&self) -> Vector3Slice<f32> {
+        fn linear(&self) -> Vector3Slice<f64> {
             self.fixed_slice::<3, 1>(3, 0)
         }
 
@@ -141,13 +141,13 @@ pub mod algebraic_robots {
         fn to_adjoint(&self) -> ProjectiveAdjointRep {
             let rotation = self.fixed_slice::<3, 3>(0, 0);
             let translation = self.fixed_slice::<3, 1>(0, 3);
-            let skew_translation =  Matrix3::<f32>::from_row_slice(&[
+            let skew_translation =  Matrix3::<f64>::from_row_slice(&[
                            0.0, -translation[2],  translation[1],
                  translation[2],            0.0, -translation[0],
                 -translation[1],  translation[0],            0.0
                 ]);
             let bottom_left = skew_translation * rotation;
-            Matrix6::<f32>::from_row_slice(&[
+            Matrix6::<f64>::from_row_slice(&[
                    *rotation.index((0, 0)),    *rotation.index((0, 1)),    *rotation.index((0, 2)),                    0.0,                     0.0,                      0.0,
                    *rotation.index((1, 0)),    *rotation.index((1, 1)),    *rotation.index((1, 2)),                    0.0,                     0.0,                      0.0,
                    *rotation.index((2, 0)),    *rotation.index((2, 1)),    *rotation.index((2, 2)),                    0.0,                     0.0,                      0.0,
@@ -172,7 +172,7 @@ pub mod algebraic_robots {
             let theta = acosinput.acos();
             let so3_algebra = {
                 if acosinput >= 1.0 {
-                    Matrix3::<f32>::zeros()
+                    Matrix3::<f64>::zeros()
                 } else if acosinput <= -1.0 {
                     let omg = {
                         if  ( 1.0 + rotation.index((2, 2)) ).abs() > EPSILLON {
@@ -186,7 +186,7 @@ pub mod algebraic_robots {
                                 * Vector3::new( 1.0 + *rotation.index((0, 0)), *rotation.index((1, 0)), *rotation.index((2, 0)))
                         }
                     };
-                    Matrix3::<f32>::from_row_slice(&[
+                    Matrix3::<f64>::from_row_slice(&[
                             0.0, -omg[2],  omg[1],
                          omg[2],     0.0, -omg[0],
                         -omg[1],  omg[0],     0.0
@@ -195,8 +195,8 @@ pub mod algebraic_robots {
                     ( ( theta / 2.0 ) / theta.sin() ) * ( rotation - rotation.transpose() )
                 }
             };
-            if so3_algebra == Matrix3::<f32>::zeros() {
-                Matrix4::<f32>::from_row_slice(&[
+            if so3_algebra == Matrix3::<f64>::zeros() {
+                Matrix4::<f64>::from_row_slice(&[
                     0.0, 0.0, 0.0, *self.index((0, 3)),
                     0.0, 0.0, 0.0, *self.index((1, 3)),
                     0.0, 0.0, 0.0, *self.index((2, 3)),
@@ -205,14 +205,14 @@ pub mod algebraic_robots {
             } else {
                 let so3_algebra_square = so3_algebra * so3_algebra;
                 let t3_algebra = (
-                                    Matrix3::<f32>::identity() -
+                                    Matrix3::<f64>::identity() -
                                     ( so3_algebra / 2.0 ) +
                                     (
                                         ( 1.0 / theta ) -
                                         ( ( 1.0 / ( theta / 2.0 ).tan() ) / 2.0 )
                                     ) * ( so3_algebra_square / theta )
                                 ) * self.fixed_slice::<3,1>(0, 3);
-                Matrix4::<f32>::from_row_slice(&[
+                Matrix4::<f64>::from_row_slice(&[
                     *so3_algebra.index((0, 0)), *so3_algebra.index((0, 1)), *so3_algebra.index((0, 2)), *t3_algebra.index((0, 0)),
                     *so3_algebra.index((1, 0)), *so3_algebra.index((1, 1)), *so3_algebra.index((1, 2)), *t3_algebra.index((1, 0)),
                     *so3_algebra.index((2, 0)), *so3_algebra.index((2, 1)), *so3_algebra.index((2, 2)), *t3_algebra.index((2, 0)),
@@ -226,7 +226,7 @@ pub mod algebraic_robots {
             let inverted_rotation = rotation.transpose();
             let translation = self.fixed_slice::<3, 1>(0, 3);
             let interted_translation = - inverted_rotation * translation;
-            Matrix4::<f32>::from_row_slice(&[
+            Matrix4::<f64>::from_row_slice(&[
                 *inverted_rotation.index((0, 0)), *inverted_rotation.index((0, 1)), *inverted_rotation.index((0, 2)), *interted_translation.index((0, 0)),
                 *inverted_rotation.index((1, 0)), *inverted_rotation.index((1, 1)), *inverted_rotation.index((1, 2)), *interted_translation.index((1, 0)),
                 *inverted_rotation.index((2, 0)), *inverted_rotation.index((2, 1)), *inverted_rotation.index((2, 2)), *interted_translation.index((2, 0)),
@@ -250,14 +250,14 @@ pub mod algebraic_robots {
                 let omgmat_square = omgmat * omgmat;
                 let angle_sin = axis_angle_rotation.angle.sin();
                 let angle_cos = axis_angle_rotation.angle.cos();
-                let so3_group = Matrix3::<f32>::identity() + ( angle_sin * omgmat) +
+                let so3_group = Matrix3::<f64>::identity() + ( angle_sin * omgmat) +
                      ( ( 1.0 - angle_cos ) * omgmat_square );
                 let t3_group = (
-                                ( Matrix3::<f32>::identity() * axis_angle_rotation.angle ) +
+                                ( Matrix3::<f64>::identity() * axis_angle_rotation.angle ) +
                                 ( ( 1.0 - angle_cos ) * omgmat ) +
                                 ( ( axis_angle_rotation.angle - angle_sin ) * omgmat_square )
                              ) * ( self.fixed_slice::<3, 1>(0, 3) / axis_angle_rotation.angle );
-                Matrix4::<f32>::from_row_slice(&[
+                Matrix4::<f64>::from_row_slice(&[
                     *so3_group.index((0, 0)), *so3_group.index((0, 1)), *so3_group.index((0, 2)), *t3_group.index((0, 0)),
                     *so3_group.index((1, 0)), *so3_group.index((1, 1)), *so3_group.index((1, 2)), *t3_group.index((1, 0)),
                     *so3_group.index((2, 0)), *so3_group.index((2, 1)), *so3_group.index((2, 2)), *t3_group.index((2, 0)),
@@ -265,7 +265,7 @@ pub mod algebraic_robots {
                 ])
             } else {
                 let linear_velocity = twist.linear();
-                Matrix4::<f32>::from_row_slice(&[
+                Matrix4::<f64>::from_row_slice(&[
                         1.0, 0.0, 0.0, linear_velocity[0],
                         0.0, 1.0, 0.0, linear_velocity[1],
                         0.0, 0.0, 1.0, linear_velocity[2],
@@ -290,7 +290,7 @@ pub mod algebraic_robots {
 
         fn from_axis_angle_and_position_rotation(
             axis_angle_rotation: &AxisAngleRotation,
-            axis_point: &Vector3<f32>) -> Twist {
+            axis_point: &Vector3<f64>) -> Twist {
             let angular_velocity = axis_angle_rotation.angle * axis_angle_rotation.axis;
             let linear_velocity = - angular_velocity.cross(axis_point);
             Twist::from_angular_linear(
@@ -301,7 +301,7 @@ pub mod algebraic_robots {
 
         fn from_axis_angle_and_velocities(
             axis_angle_rotation: &AxisAngleRotation,
-            linear_velocity: &Vector3<f32>) -> Twist {
+            linear_velocity: &Vector3<f64>) -> Twist {
             Twist::from_angular_linear(
                 axis_angle_rotation.angle * axis_angle_rotation.axis,
                 *linear_velocity
@@ -313,7 +313,7 @@ pub mod algebraic_robots {
             let angle = angular_velocity.norm();
             AxisAngleRotation {
                 axis: Unit::new_normalize(
-                    Vector3::<f32>::from_row_slice(angular_velocity.as_slice())).into_inner(),
+                    Vector3::<f64>::from_row_slice(angular_velocity.as_slice())).into_inner(),
                 angle: angle
             }
         }
@@ -321,7 +321,7 @@ pub mod algebraic_robots {
         fn to_algebra(&self) -> ProjectiveAlgebraRep {
             let angular_velocity = self.angular();
             let linear_velocity = self.linear();
-            Matrix4::<f32>::from_row_slice(&[
+            Matrix4::<f64>::from_row_slice(&[
                                      0.0, -angular_velocity[2],  angular_velocity[1], linear_velocity[0],
                      angular_velocity[2],                  0.0, -angular_velocity[0], linear_velocity[1],
                     -angular_velocity[1],  angular_velocity[0],                  0.0, linear_velocity[2],
