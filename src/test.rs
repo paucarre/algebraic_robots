@@ -4,7 +4,7 @@ use super::*;
 use algebraic_robots::*;
 use nalgebra::{ Unit, Vector3, Matrix4, DMatrix};
 use screw_chains::{UniversalRobotsUR5, Revolute3Prismatic, ScrewChainLike};
-use std::f32::consts::PI;
+use std::f64::consts::PI;
 
 #[test]
 fn test_to_algebra() {
@@ -15,9 +15,9 @@ fn test_to_algebra() {
         },
         &Vector3::new(20.0, 30.0, 40.0)
     );
-    let angle = 1.0 / 3.0f32.sqrt();
+    let angle = 1.0 / 3.0f64.sqrt();
     let algebra = twist.to_algebra();
-    let expected_algebra =  Matrix4::<f32>::from_row_slice(&[
+    let expected_algebra =  Matrix4::<f64>::from_row_slice(&[
               0.0, -angle,  angle, 20.0,
             angle,    0.0, -angle, 30.0,
            -angle,  angle,    0.0, 40.0,
@@ -67,7 +67,7 @@ fn test_exp_only_translation() {
     );
     let algebra = twist.to_algebra();
     let transformation = algebra.exponential();
-    let expected_transformation = Matrix4::<f32>::from_row_slice(&[
+    let expected_transformation = Matrix4::<f64>::from_row_slice(&[
         1.0, 0.0, 0.0,  20.0,
         0.0, 1.0, 0.0, -30.0,
         0.0, 0.0, 1.0,  40.0,
@@ -88,7 +88,7 @@ fn test_exp_only_rotation_x() {
     );
     let algebra = twist.to_algebra();
     let transformation = algebra.exponential();
-    let expected_transformation = Matrix4::<f32>::from_row_slice(&[
+    let expected_transformation = Matrix4::<f64>::from_row_slice(&[
         1.0, 0.0, 0.0, 0.0,
         0.0, angle_axis_rotation.angle.cos(), -angle_axis_rotation.angle.sin(), 0.0,
         0.0, angle_axis_rotation.angle.sin(), angle_axis_rotation.angle.cos(), 0.0,
@@ -111,7 +111,7 @@ fn test_exp_only_rotation_y() {
     );
     let algebra = twist.to_algebra();
     let transformation = algebra.exponential();
-    let expected_transformation = Matrix4::<f32>::from_row_slice(&[
+    let expected_transformation = Matrix4::<f64>::from_row_slice(&[
         angle_axis_rotation.angle.cos(), 0.0, angle_axis_rotation.angle.sin(), 0.0,
         0.0, 1.0, 0.0, 0.0,
         -angle_axis_rotation.angle.sin(), 0.0, angle_axis_rotation.angle.cos(), 0.0,
@@ -134,7 +134,7 @@ fn test_exp_only_rotation_z() {
     );
     let algebra = twist.to_algebra();
     let transformation = algebra.exponential();
-    let expected_transformation = Matrix4::<f32>::from_row_slice(&[
+    let expected_transformation = Matrix4::<f64>::from_row_slice(&[
         angle_axis_rotation.angle.cos(), -angle_axis_rotation.angle.sin(), 0.0, 0.0,
         angle_axis_rotation.angle.sin(),  angle_axis_rotation.angle.cos(), 0.0, 0.0,
         0.0, 0.0, 1.0, 0.0,
@@ -157,7 +157,7 @@ fn test_exp_rotation_and_axis() {
     );
     let algebra = twist.to_algebra();
     let transformation = algebra.exponential();
-    let expected_transformation = Matrix4::<f32>::from_row_slice(&[
+    let expected_transformation = Matrix4::<f64>::from_row_slice(&[
         angle_axis_rotation.angle.cos(), -angle_axis_rotation.angle.sin(), 0.0,  2.0,
         angle_axis_rotation.angle.sin(),  angle_axis_rotation.angle.cos(), 0.0,  0.0,
         0.0, 0.0, 1.0, 0.0,
@@ -180,7 +180,7 @@ fn test_exp_rotation_z_and_translation() {
     );
     let algebra = twist.to_algebra();
     let transformation = algebra.exponential();
-    let expected_transformation = Matrix4::<f32>::from_row_slice(&[
+    let expected_transformation = Matrix4::<f64>::from_row_slice(&[
         angle_axis_rotation.angle.cos(), -angle_axis_rotation.angle.sin(), 0.0,  2.0,
         angle_axis_rotation.angle.sin(),  angle_axis_rotation.angle.cos(), 0.0,  0.0,
         0.0, 0.0, 1.0, 0.0,
@@ -193,13 +193,13 @@ fn test_exp_rotation_z_and_translation() {
 
 #[test]
 fn test_exp() {
-    let algebra = Matrix4::<f32>::from_row_slice(&[
+    let algebra = Matrix4::<f64>::from_row_slice(&[
         0.0, 0.0, 0.0, 0.0,
         0.0, 0.0, -1.57079632, 2.35619449,
         0.0, 1.57079632, 0.0, 2.35619449,
         0.0, 0.0, 0.0, 0.0,
     ]);
-    let expected_transformation = Matrix4::<f32>::from_row_slice(&[
+    let expected_transformation = Matrix4::<f64>::from_row_slice(&[
         1.0, 0.0,  0.0, 0.0,
         0.0, 0.0, -1.0, 0.0,
         0.0, 1.0,  0.0, 3.0,
@@ -213,7 +213,7 @@ fn test_exp() {
 
 #[test]
 fn test_log() {
-    let expected_algebra = Matrix4::<f32>::from_row_slice(&[
+    let expected_algebra = Matrix4::<f64>::from_row_slice(&[
         0.0, 0.0, 0.0, 0.0,
         0.0, 0.0, -1.57079632, 2.35619449,
         0.0, 1.57079632, 0.0, 2.35619449,
@@ -277,7 +277,7 @@ fn test_log_angle_axis_velocity_third() {
     let reconstructed_algebra = transformation.logarithm();
     let transformation_reconstructed = reconstructed_algebra.exponential();
     let transform = transformation_reconstructed.invert() * transformation;
-    let errors = &( transform - Matrix4::<f32>::identity() );
+    let errors = &( transform - Matrix4::<f64>::identity() );
     let error = errors.fold(0.0, |sum, element| sum + ( element * element ) );
     assert!(error < EPSILLON);
 }
@@ -295,7 +295,7 @@ fn test_invert() {
     let expected_algebra = twist.to_algebra();
     let transformation = expected_algebra.exponential();
     let transform = transformation.invert() * transformation;
-    let errors = &( transform - Matrix4::<f32>::identity() );
+    let errors = &( transform - Matrix4::<f64>::identity() );
     let error = errors.fold(0.0, |sum, element| sum + ( element * element ) );
     assert!(error < EPSILLON);
 }
@@ -325,7 +325,7 @@ fn test_screw_chain() {
     let coordinates = &[0.0, -PI / 2., 0.0, 0.0, PI / 2.0, 0.0];
     let universal_robots_ur5 = UniversalRobotsUR5::from_default().unwrap();
     let transformation = universal_robots_ur5.to_transform(coordinates).unwrap();
-    let expectd_transformation = Matrix4::<f32>::from_row_slice(&[
+    let expectd_transformation = Matrix4::<f64>::from_row_slice(&[
         0.0, -1.0, 0.0, 0.095,
         1.0,  0.0, 0.0, 0.109,
         0.0,  0.0, 1.0, 0.988,
@@ -342,7 +342,7 @@ fn test_screw_chain_revolute_3_prismatic_1() {
     let coordinates = &[PI / 2.0, -PI, PI / 2.0, 10.0];
     let revolute_3_prismatic_1 = Revolute3Prismatic::from_default().unwrap();
     let transformation = revolute_3_prismatic_1.to_transform(coordinates).unwrap();
-    let expectd_transformation = Matrix4::<f32>::from_row_slice(&[
+    let expectd_transformation = Matrix4::<f64>::from_row_slice(&[
             1.0, 0.0, 0.0,  0.0,
             0.0, 1.0, 0.0,  0.0,
             0.0, 0.0, 1.0, 10.0,
