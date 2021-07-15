@@ -23,7 +23,6 @@ fn main() {
         .init_resource::<UiState>()
         .add_plugins(DefaultPlugins)
         .add_plugin(EguiPlugin)
-        .add_startup_system(load_assets.system())
         .add_system(update_ui_scale_factor.system())
         .add_system(ui_example.system())
         .run();
@@ -37,10 +36,6 @@ struct UiState {
     inverted: bool,
 }
 
-fn load_assets(mut egui_context: ResMut<EguiContext>, assets: Res<AssetServer>) {
-    let texture_handle = assets.load("icon.png");
-    egui_context.set_egui_texture(BEVY_TEXTURE_ID, texture_handle);
-}
 
 fn update_ui_scale_factor(mut egui_settings: ResMut<EguiSettings>, windows: Res<Windows>) {
     if let Some(window) = windows.get_primary() {
@@ -78,11 +73,6 @@ fn ui_example(
                 invert = ui.button("Invert").clicked();
                 remove = ui.button("Remove").clicked();
             });
-
-            ui.add(egui::widgets::Image::new(
-                egui::TextureId::User(BEVY_TEXTURE_ID),
-                [256.0, 256.0],
-            ));
 
             ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
                 ui.add(
