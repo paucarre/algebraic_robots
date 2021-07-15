@@ -6,7 +6,8 @@ pub mod algebraic_robots {
     use std::f64::consts::PI;
 
     pub static EPSILLON: f64 = 1e-14;
-    pub type Vector3Slice<'a, T, RStride = U1, CStride = U6> = Matrix<T, U3, U1, SliceStorage<'a, T, U3, U1, RStride, CStride>>;
+    pub type Vector3Slice<'a, T, RStride = U1, CStride = U6> =
+        Matrix<T, U3, U1, SliceStorage<'a, T, U3, U1, RStride, CStride>>;
 
     #[derive(Debug, PartialEq, PartialOrd)]
     pub struct AxisAngleRotation {
@@ -75,7 +76,8 @@ pub mod algebraic_robots {
             }
         }
 
-        fn add_transformation(transforms : Vec<Matrix4<f64>>, screw_coordinate: (&Vector6<f64>, &f64) ) -> Vec<Matrix4<f64>> {
+        fn add_transformation(transforms : Vec<Matrix4<f64>>,
+                screw_coordinate: (&Vector6<f64>, &f64) ) -> Vec<Matrix4<f64>> {
             let (screw, coordinate) = screw_coordinate;
             let screw_transformation : Matrix4<f64> = (*screw * *coordinate).to_algebra().exponential();
             let new_transformation : Matrix4<f64> = transforms.last().unwrap() * screw_transformation;
@@ -83,7 +85,8 @@ pub mod algebraic_robots {
             new_transformations
         }
 
-        fn add_jacobinan_column(jacobian_columns : Vec<Vector6<f64>>, screw_and_incremental_transformation: (&Vector6<f64>, &Matrix4<f64>) ) -> Vec<Vector6<f64>> {
+        fn add_jacobinan_column(jacobian_columns : Vec<Vector6<f64>>,
+                screw_and_incremental_transformation: (&Vector6<f64>, &Matrix4<f64>) ) -> Vec<Vector6<f64>> {
             let (screw,_transformation) = screw_and_incremental_transformation;
             let adjoint_transformation : Matrix6<f64> = _transformation.to_adjoint();
             let jacobian_column : Vector6<f64> = adjoint_transformation *  screw;
@@ -95,10 +98,14 @@ pub mod algebraic_robots {
             if coordinates.len() == self.screws.len() {
                 let screws_and_coordinates = self.screws.iter().zip(coordinates.iter());
                 let identity : Vec<Matrix4<f64>> = vec![Matrix4::identity()];
-                let incremental_transform_screws : Vec<Matrix4<f64>> = screws_and_coordinates.fold(identity, ScrewChain::add_transformation);
-                let screws_and_incremental_transformations = self.screws.iter().zip(incremental_transform_screws.iter());
-                let jacobian_columns : &Vec<Vector6<f64>> = &screws_and_incremental_transformations.fold(vec![], ScrewChain::add_jacobinan_column);
-                let raw_iter = jacobian_columns.into_iter().flat_map(|vector| vector.into_iter()).map(|x| *x).collect::<Vec<_>>();
+                let incremental_transform_screws : Vec<Matrix4<f64>> = screws_and_coordinates.fold(
+                    identity, ScrewChain::add_transformation);
+                let screws_and_incremental_transformations = self.screws.iter().zip(
+                    incremental_transform_screws.iter());
+                let jacobian_columns : &Vec<Vector6<f64>> = &screws_and_incremental_transformations.fold(
+                    vec![], ScrewChain::add_jacobinan_column);
+                let raw_iter = jacobian_columns.into_iter().flat_map(|vector| vector.into_iter()).
+                    map(|x| *x).collect::<Vec<_>>();
                 let jacobian_matrix : DMatrix<f64> = DMatrix::from_vec(6, coordinates.len(), raw_iter);
                 return Option::Some(jacobian_matrix)
             } else {
@@ -139,28 +146,28 @@ pub mod algebraic_robots {
     impl SE3Group for ProjectiveGroupRep {
 
         fn to_adjoint(&self) -> ProjectiveAdjointRep {
-            let rotation = self.fixed_slice::<3, 3>(0, 0);
+            let so3 = self.fixed_slice::<3, 3>(0, 0);
             let translation = self.fixed_slice::<3, 1>(0, 3);
             let skew_translation =  Matrix3::<f64>::from_row_slice(&[
                            0.0, -translation[2],  translation[1],
                  translation[2],            0.0, -translation[0],
                 -translation[1],  translation[0],            0.0
                 ]);
-            let bottom_left = skew_translation * rotation;
+            let t3 = skew_translation * so3;
             Matrix6::<f64>::from_row_slice(&[
-                   *rotation.index((0, 0)),    *rotation.index((0, 1)),    *rotation.index((0, 2)),                    0.0,                     0.0,                      0.0,
-                   *rotation.index((1, 0)),    *rotation.index((1, 1)),    *rotation.index((1, 2)),                    0.0,                     0.0,                      0.0,
-                   *rotation.index((2, 0)),    *rotation.index((2, 1)),    *rotation.index((2, 2)),                    0.0,                     0.0,                      0.0,
-                *bottom_left.index((0, 0)), *bottom_left.index((0, 1)), *bottom_left.index((0, 2)), *rotation.index((0, 0)), *rotation.index((0, 1)), *rotation.index((0, 2)),
-                *bottom_left.index((1, 0)), *bottom_left.index((1, 1)), *bottom_left.index((1, 2)), *rotation.index((1, 0)), *rotation.index((1, 1)), *rotation.index((1, 2)),
-                *bottom_left.index((2, 0)), *bottom_left.index((2, 1)), *bottom_left.index((2, 2)), *rotation.index((2, 0)), *rotation.index((2, 1)), *rotation.index((2, 2)),
+                *so3.index((0, 0)), *so3.index((0, 1)), *so3.index((0, 2)),                0.0,                0.0,                0.0,
+                *so3.index((1, 0)), *so3.index((1, 1)), *so3.index((1, 2)),                0.0,                0.0,                0.0,
+                *so3.index((2, 0)), *so3.index((2, 1)), *so3.index((2, 2)),                0.0,                0.0,                0.0,
+                 *t3.index((0, 0)),  *t3.index((0, 1)),  *t3.index((0, 2)), *so3.index((0, 0)), *so3.index((0, 1)), *so3.index((0, 2)),
+                 *t3.index((1, 0)),  *t3.index((1, 1)),  *t3.index((1, 2)), *so3.index((1, 0)), *so3.index((1, 1)), *so3.index((1, 2)),
+                 *t3.index((2, 0)),  *t3.index((2, 1)),  *t3.index((2, 2)), *so3.index((2, 0)), *so3.index((2, 1)), *so3.index((2, 2)),
             ])
         }
 
         fn logarithm(&self) -> ProjectiveAlgebraRep {
-            let rotation = self.fixed_slice::<3, 3>(0, 0);
+            let so3 = self.fixed_slice::<3, 3>(0, 0);
             let acosinput =  {
-                let acosinput_raw = (rotation.trace() - 1.0) / 2.0;
+                let acosinput_raw = (so3.trace() - 1.0) / 2.0;
                 if (acosinput_raw + 1.0).abs() < EPSILLON {
                     -1.0
                 } else if (acosinput_raw - 1.0).abs() < EPSILLON {
@@ -170,20 +177,20 @@ pub mod algebraic_robots {
                 }
             };
             let theta = acosinput.acos();
-            let so3_algebra = {
+            let so3_alg = {
                 if acosinput >= 1.0 {
                     Matrix3::<f64>::zeros()
                 } else if acosinput <= -1.0 {
                     let omg = {
-                        if  ( 1.0 + rotation.index((2, 2)) ).abs() > EPSILLON {
-                            ( 1.0 / ( 2.0 * ( 1.0 + rotation.index((2, 2)))).sqrt() )
-                                * Vector3::new( *rotation.index((0, 2)), *rotation.index((1, 2)), 1.0 + (*rotation.index((2, 2))) )
-                        } else if (1.0 + rotation.index((1, 1))).abs() > EPSILLON {
-                            ( 1.0 / ( 2.0 * (1.0 + *rotation.index((1, 1)) )).sqrt() )
-                                * Vector3::new( *rotation.index((0, 1)), 1.0  + *rotation.index((1, 1)), *rotation.index((2,1)) )
+                        if  ( 1.0 + so3.index((2, 2)) ).abs() > EPSILLON {
+                            ( 1.0 / ( 2.0 * ( 1.0 + so3.index((2, 2)))).sqrt() )
+                                * Vector3::new( *so3.index((0, 2)), *so3.index((1, 2)), 1.0 + (*so3.index((2, 2))) )
+                        } else if (1.0 + so3.index((1, 1))).abs() > EPSILLON {
+                            ( 1.0 / ( 2.0 * (1.0 + *so3.index((1, 1)) )).sqrt() )
+                                * Vector3::new( *so3.index((0, 1)), 1.0  + *so3.index((1, 1)), *so3.index((2,1)) )
                         } else {
-                            (1.0 / ( 2.0 * ( 1.0 + *rotation.index((0, 0))) ).sqrt() )
-                                * Vector3::new( 1.0 + *rotation.index((0, 0)), *rotation.index((1, 0)), *rotation.index((2, 0)))
+                            (1.0 / ( 2.0 * ( 1.0 + *so3.index((0, 0))) ).sqrt() )
+                                * Vector3::new( 1.0 + *so3.index((0, 0)), *so3.index((1, 0)), *so3.index((2, 0)))
                         }
                     };
                     Matrix3::<f64>::from_row_slice(&[
@@ -192,10 +199,10 @@ pub mod algebraic_robots {
                         -omg[1],  omg[0],     0.0
                     ]) * PI
                 } else {
-                    ( ( theta / 2.0 ) / theta.sin() ) * ( rotation - rotation.transpose() )
+                    ( ( theta / 2.0 ) / theta.sin() ) * ( so3 - so3.transpose() )
                 }
             };
-            if so3_algebra == Matrix3::<f64>::zeros() {
+            if so3_alg == Matrix3::<f64>::zeros() {
                 Matrix4::<f64>::from_row_slice(&[
                     0.0, 0.0, 0.0, *self.index((0, 3)),
                     0.0, 0.0, 0.0, *self.index((1, 3)),
@@ -203,34 +210,34 @@ pub mod algebraic_robots {
                     0.0, 0.0, 0.0,                 0.0,
                 ])
             } else {
-                let so3_algebra_square = so3_algebra * so3_algebra;
-                let t3_algebra = (
+                let so3_algebra_square = so3_alg * so3_alg;
+                let t3_alg = (
                                     Matrix3::<f64>::identity() -
-                                    ( so3_algebra / 2.0 ) +
+                                    ( so3_alg / 2.0 ) +
                                     (
                                         ( 1.0 / theta ) -
                                         ( ( 1.0 / ( theta / 2.0 ).tan() ) / 2.0 )
                                     ) * ( so3_algebra_square / theta )
                                 ) * self.fixed_slice::<3,1>(0, 3);
                 Matrix4::<f64>::from_row_slice(&[
-                    *so3_algebra.index((0, 0)), *so3_algebra.index((0, 1)), *so3_algebra.index((0, 2)), *t3_algebra.index((0, 0)),
-                    *so3_algebra.index((1, 0)), *so3_algebra.index((1, 1)), *so3_algebra.index((1, 2)), *t3_algebra.index((1, 0)),
-                    *so3_algebra.index((2, 0)), *so3_algebra.index((2, 1)), *so3_algebra.index((2, 2)), *t3_algebra.index((2, 0)),
-                                           0.0,                        0.0,                        0.0,                       0.0,
+                    *so3_alg.index((0, 0)), *so3_alg.index((0, 1)), *so3_alg.index((0, 2)), *t3_alg.index((0, 0)),
+                    *so3_alg.index((1, 0)), *so3_alg.index((1, 1)), *so3_alg.index((1, 2)), *t3_alg.index((1, 0)),
+                    *so3_alg.index((2, 0)), *so3_alg.index((2, 1)), *so3_alg.index((2, 2)), *t3_alg.index((2, 0)),
+                                       0.0,                    0.0,                    0.0,                   0.0,
                 ])
             }
         }
 
         fn invert(&self) -> ProjectiveGroupRep {
             let rotation = self.fixed_slice::<3, 3>(0, 0);
-            let inverted_rotation = rotation.transpose();
+            let invert_so3 = rotation.transpose();
             let translation = self.fixed_slice::<3, 1>(0, 3);
-            let interted_translation = - inverted_rotation * translation;
+            let inv_t3 = - invert_so3 * translation;
             Matrix4::<f64>::from_row_slice(&[
-                *inverted_rotation.index((0, 0)), *inverted_rotation.index((0, 1)), *inverted_rotation.index((0, 2)), *interted_translation.index((0, 0)),
-                *inverted_rotation.index((1, 0)), *inverted_rotation.index((1, 1)), *inverted_rotation.index((1, 2)), *interted_translation.index((1, 0)),
-                *inverted_rotation.index((2, 0)), *inverted_rotation.index((2, 1)), *inverted_rotation.index((2, 2)), *interted_translation.index((2, 0)),
-                                             0.0,                              0.0,                              0.0,                                 1.0,
+                *invert_so3.index((0, 0)), *invert_so3.index((0, 1)), *invert_so3.index((0, 2)), *inv_t3.index((0, 0)),
+                *invert_so3.index((1, 0)), *invert_so3.index((1, 1)), *invert_so3.index((1, 2)), *inv_t3.index((1, 0)),
+                *invert_so3.index((2, 0)), *invert_so3.index((2, 1)), *invert_so3.index((2, 2)), *inv_t3.index((2, 0)),
+                                      0.0,                       0.0,                       0.0,                   1.0,
             ])
         }
 
@@ -250,7 +257,7 @@ pub mod algebraic_robots {
                 let omgmat_square = omgmat * omgmat;
                 let angle_sin = axis_angle_rotation.angle.sin();
                 let angle_cos = axis_angle_rotation.angle.cos();
-                let so3_group = Matrix3::<f64>::identity() + ( angle_sin * omgmat) +
+                let so3 = Matrix3::<f64>::identity() + ( angle_sin * omgmat) +
                      ( ( 1.0 - angle_cos ) * omgmat_square );
                 let t3_group = (
                                 ( Matrix3::<f64>::identity() * axis_angle_rotation.angle ) +
@@ -258,10 +265,10 @@ pub mod algebraic_robots {
                                 ( ( axis_angle_rotation.angle - angle_sin ) * omgmat_square )
                              ) * ( self.fixed_slice::<3, 1>(0, 3) / axis_angle_rotation.angle );
                 Matrix4::<f64>::from_row_slice(&[
-                    *so3_group.index((0, 0)), *so3_group.index((0, 1)), *so3_group.index((0, 2)), *t3_group.index((0, 0)),
-                    *so3_group.index((1, 0)), *so3_group.index((1, 1)), *so3_group.index((1, 2)), *t3_group.index((1, 0)),
-                    *so3_group.index((2, 0)), *so3_group.index((2, 1)), *so3_group.index((2, 2)), *t3_group.index((2, 0)),
-                                         0.0,                      0.0,                      0.0,                     1.0,
+                    *so3.index((0, 0)), *so3.index((0, 1)), *so3.index((0, 2)), *t3_group.index((0, 0)),
+                    *so3.index((1, 0)), *so3.index((1, 1)), *so3.index((1, 2)), *t3_group.index((1, 0)),
+                    *so3.index((2, 0)), *so3.index((2, 1)), *so3.index((2, 2)), *t3_group.index((2, 0)),
+                                   0.0,                0.0,                0.0,                     1.0,
                 ])
             } else {
                 let linear_velocity = twist.linear();

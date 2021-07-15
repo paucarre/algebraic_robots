@@ -14,3 +14,7 @@ A Rust Library for SE3
 
 ## Future plans:
 - Visualization
+
+# Run Visualization
+cargo build --example ui
+cargo run --example ui
