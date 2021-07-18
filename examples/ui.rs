@@ -24,7 +24,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugin(EguiPlugin)
         .add_system(update_ui_scale_factor.system())
-        .add_system(ui_example.system())
+        .add_system(visualization.system())
         .run();
 }
 
@@ -43,7 +43,7 @@ fn update_ui_scale_factor(mut egui_settings: ResMut<EguiSettings>, windows: Res<
     }
 }
 
-fn ui_example(
+fn visualization(
     mut egui_ctx: ResMut<EguiContext>,
     mut ui_state: ResMut<UiState>,
     assets: Res<AssetServer>,
@@ -93,12 +93,8 @@ fn ui_example(
     });
 
     egui::CentralPanel::default().show(egui_ctx.ctx(), |ui| {
-        ui.heading("Egui Template");
-        ui.hyperlink("https://github.com/emilk/egui_template");
-        ui.add(egui::github_link_file_line!(
-            "https://github.com/emilk/egui_template/blob/master/",
-            "Direct link to source code."
-        ));
+        ui.heading("Algebraic Robots");
+        ui.hyperlink("https://github.com/paucarre/algebraic_robots");
         egui::warn_if_debug_build(ui);
 
         ui.separator();
@@ -113,15 +109,6 @@ fn ui_example(
             ui_state.painting.ui_content(ui);
         });
     });
-
-    egui::Window::new("Window")
-        .scroll(true)
-        .show(egui_ctx.ctx(), |ui| {
-            ui.label("Windows can be moved by dragging them.");
-            ui.label("They are automatically sized based on contents.");
-            ui.label("You can turn on resizing and scrolling if you like.");
-            ui.label("You would normally chose either panels OR windows.");
-        });
 
     if invert {
         ui_state.inverted = !ui_state.inverted;
