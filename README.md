@@ -14,3 +14,14 @@ A Rust Library for SE3
 
 ## Future plans:
 - Visualization
+
+# Visualization Examples ( ongoing work, not ready)
+## Build
+```
+cargo build --example ui
+```
+
+## Run
+```
+cargo run --example ui
+```
