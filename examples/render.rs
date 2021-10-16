@@ -15,17 +15,10 @@ struct PanOrbitCamera {
 	/// The amount of deceleration to apply to the camera's motion.
 	/// The current velocity of the FlyCamera2d. This value is always up-to-date, enforced by [FlyCameraPlugin](struct.FlyCameraPlugin.html)
 	/// Key used to move left. Defaults to <kbd>A</kbd>
-	pub key_left: KeyCode,
-	/// Key used to move right. Defaults to <kbd>D</kbd>
-	pub key_right: KeyCode,
-	/// Key used to move up. Defaults to <kbd>W</kbd>
-	pub key_up: KeyCode,
-	/// Key used to move forward. Defaults to <kbd>S</kbd>
-	pub key_down: KeyCode,
+	linear_keys: Keys,
+    rotation_keys: Keys,
 	/// If `false`, disable keyboard control of the camera. Defaults to `true`
 	pub enabled: bool,
-    pub key_forward: KeyCode,
-    pub key_backward: KeyCode,
     pub key_rotation: KeyCode,
     pub linear_kinematic_state: KinematicState,
     pub rotational_kinematic_state: KinematicState,
@@ -36,6 +29,15 @@ struct KinematicState {
    max_speed: f32,
    friction: f32,
    velocity: Vec3,
+}
+
+struct Keys {
+    key_left: KeyCode,
+    key_right: KeyCode,
+    key_up: KeyCode,
+    key_down: KeyCode,
+    key_forward: KeyCode,
+    key_backward: KeyCode,
 }
 
 trait KinematicStateOperations {
@@ -114,13 +116,23 @@ impl Default for PanOrbitCamera {
             radius: 5.0,
             upside_down: false,
             // Keybaord 3D PAN
-            key_left: KeyCode::A,
-            key_right: KeyCode::D,
-            key_up: KeyCode::R,
-            key_down: KeyCode::F,
-            key_forward: KeyCode::W,
-            key_backward: KeyCode::S,
             key_rotation: KeyCode::LShift,
+            linear_keys: Keys {
+                key_left: KeyCode::A,
+                key_right: KeyCode::D,
+                key_up: KeyCode::R,
+                key_down: KeyCode::F,
+                key_forward: KeyCode::W,
+                key_backward: KeyCode::S,
+            },
+            rotation_keys: Keys {
+                key_left: KeyCode::R,
+                key_right: KeyCode::F,
+                key_up: KeyCode::A,
+                key_down: KeyCode::D,
+                key_forward: KeyCode::W,
+                key_backward: KeyCode::S,
+            },
             enabled: true,
             rotational_kinematic_state: KinematicState {
                 acceleration: 0.02,
@@ -160,17 +172,23 @@ fn camera_2d_movement_system(
     mut query: Query<(&mut PanOrbitCamera, &mut Transform)>,
 ) {
 	for (mut options, mut transform) in query.iter_mut() {
+        let is_rotation = keyboard_input.pressed(options.key_rotation);
+        let keys = if is_rotation {
+            &options.rotation_keys
+        } else {
+            &options.linear_keys
+        };
 		let (axis_horizontal, axis_vertical, axis_depth) = if options.enabled {
 			(
-				movement_axis(&keyboard_input, options.key_right, options.key_left),
-				movement_axis(&keyboard_input, options.key_up, options.key_down),
-				movement_axis(&keyboard_input, options.key_backward, options.key_forward),
+				movement_axis(&keyboard_input, keys.key_right   , keys.key_left),
+				movement_axis(&keyboard_input, keys.key_up      , keys.key_down),
+				movement_axis(&keyboard_input, keys.key_backward, keys.key_forward),
 			)
 		} else {
 			(0.0, 0.0, 0.0)
 		};
 
-        if keyboard_input.pressed(options.key_rotation) {
+        if is_rotation {
             options.rotational_kinematic_state.apply_acceleration(&time, axis_horizontal, axis_vertical, axis_depth);
         } else {
             options.linear_kinematic_state.apply_acceleration(&time, axis_horizontal, axis_vertical, axis_depth);
