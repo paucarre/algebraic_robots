@@ -2,19 +2,12 @@ use bevy::prelude::*;
 use bevy::input::mouse::{MouseWheel,MouseMotion};
 use bevy::render::camera::PerspectiveProjection;
 
-// ANCHOR: example
-/// Tags an entity as capable of panning and orbiting.
 struct PanOrbitCamera {
-    /// The "focus point" to orbit around. It is automatically updated when panning the camera
+    /// Mouse
     pub focus: Vec3,
     pub radius: f32,
     pub upside_down: bool,
-    //2D
-    // The speed the FlyCamera2d accelerates at.
-	/// The maximum speed the FlyCamera can move at.
-	/// The amount of deceleration to apply to the camera's motion.
-	/// The current velocity of the FlyCamera2d. This value is always up-to-date, enforced by [FlyCameraPlugin](struct.FlyCameraPlugin.html)
-	/// Key used to move left. Defaults to <kbd>A</kbd>
+    // Keyboard
 	linear_keys: Keys,
     rotation_keys: Keys,
 	/// If `false`, disable keyboard control of the camera. Defaults to `true`
@@ -41,11 +34,10 @@ struct Keys {
 }
 
 trait KinematicStateOperations {
-    fn compute_acceleration(&self, 
-        axis_horizontal: f32, axis_vertical: f32, axis_depth: f32) -> Vec3;
+    fn compute_acceleration(&self, force: Vec3) -> Vec3;
     fn compute_friction(&self) -> Vec3;
     fn compute_velocity(&self, friction: Vec3, time: &Res<Time>) -> Vec3;
-    fn apply_acceleration(&mut self, time: &Res<Time>, axis_horizontal: f32, axis_vertical: f32, axis_depth: f32);
+    fn apply_acceleration(&mut self, time: &Res<Time>, force: Vec3);
     fn update_kinematic_state(&mut self, time: &Res<Time>);
     fn as_rotation(&self) -> Quat;
     fn as_translation(&self) -> Vec3;
@@ -54,11 +46,8 @@ trait KinematicStateOperations {
 impl KinematicStateOperations for KinematicState {
 
 
-    fn compute_acceleration(&self, 
-        axis_horizontal: f32, axis_vertical: f32, axis_depth: f32) -> Vec3 {
-        let acceleration: Vec3 = (Vec3::X * axis_horizontal) + 
-            (Vec3::Y * axis_vertical) + 
-            (Vec3::Z * axis_depth);
+    fn compute_acceleration(&self, force: Vec3) -> Vec3 {
+        let acceleration = force;
         if acceleration.length() != 0.0 {
             acceleration.normalize() * self.acceleration
         } else {
@@ -85,8 +74,8 @@ impl KinematicStateOperations for KinematicState {
         (velocity_clamped + delta_friction) * (Vec3::new(0.5, 0.5, 0.5) + sign_difference)
     }
 
-    fn apply_acceleration(&mut self, time: &Res<Time>, axis_horizontal: f32, axis_vertical: f32, axis_depth: f32) {
-        let acceleration = self.compute_acceleration(axis_horizontal, axis_vertical, axis_depth);
+    fn apply_acceleration(&mut self, time: &Res<Time>, force: Vec3) {
+        let acceleration = self.compute_acceleration(force);
 		self.velocity += acceleration * time.delta_seconds();
     }
 
@@ -165,6 +154,17 @@ pub fn movement_axis(
 	axis
 }
 
+fn get_key_force(is_enabled: bool, keyboard_input: &Res<Input<KeyCode>>, keys: &Keys) -> Vec3 {
+    if is_enabled {
+        Vec3::new(
+            movement_axis(&keyboard_input, keys.key_right   , keys.key_left),
+            movement_axis(&keyboard_input, keys.key_up      , keys.key_down),
+            movement_axis(&keyboard_input, keys.key_backward, keys.key_forward),
+        )
+    } else {
+        Vec3::new(0.0, 0.0, 0.0)
+    }
+}
 
 fn camera_2d_movement_system(
 	time: Res<Time>,
@@ -178,20 +178,11 @@ fn camera_2d_movement_system(
         } else {
             &options.linear_keys
         };
-		let (axis_horizontal, axis_vertical, axis_depth) = if options.enabled {
-			(
-				movement_axis(&keyboard_input, keys.key_right   , keys.key_left),
-				movement_axis(&keyboard_input, keys.key_up      , keys.key_down),
-				movement_axis(&keyboard_input, keys.key_backward, keys.key_forward),
-			)
-		} else {
-			(0.0, 0.0, 0.0)
-		};
-
+        let force = get_key_force(options.enabled, &keyboard_input, &keys);
         if is_rotation {
-            options.rotational_kinematic_state.apply_acceleration(&time, axis_horizontal, axis_vertical, axis_depth);
+            options.rotational_kinematic_state.apply_acceleration(&time, force);
         } else {
-            options.linear_kinematic_state.apply_acceleration(&time, axis_horizontal, axis_vertical, axis_depth);
+            options.linear_kinematic_state.apply_acceleration(&time, force);
         }
         options.rotational_kinematic_state.update_kinematic_state(&time);
         let rotation = options.rotational_kinematic_state.as_rotation();
