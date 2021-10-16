@@ -7,14 +7,20 @@ struct PanOrbitCamera {
     pub focus: Vec3,
     pub radius: f32,
     pub upside_down: bool,
+    pub configuration: CameraConfiguration,
+    pub linear_kinematic_state: KinematicState,
+    pub rotational_kinematic_state: KinematicState,
+    pub camera_position: Vec3,
+    pub camera_orientation: Quat,
+}
+
+struct CameraConfiguration {
     // Keyboard
-	linear_keys: Keys,
-    rotation_keys: Keys,
+	pub linear_keys: Keys,
+    pub rotation_keys: Keys,
 	/// If `false`, disable keyboard control of the camera. Defaults to `true`
 	pub enabled: bool,
     pub key_rotation: KeyCode,
-    pub linear_kinematic_state: KinematicState,
-    pub rotational_kinematic_state: KinematicState,
 }
 
 struct KinematicState {
@@ -104,25 +110,27 @@ impl Default for PanOrbitCamera {
             focus: Vec3::ZERO,
             radius: 5.0,
             upside_down: false,
-            // Keybaord 3D PAN
-            key_rotation: KeyCode::LShift,
-            linear_keys: Keys {
-                key_left: KeyCode::A,
-                key_right: KeyCode::D,
-                key_up: KeyCode::R,
-                key_down: KeyCode::F,
-                key_forward: KeyCode::W,
-                key_backward: KeyCode::S,
+            configuration: CameraConfiguration {
+                // Keybaord 3D PAN
+                key_rotation: KeyCode::LShift,
+                linear_keys: Keys {
+                    key_left: KeyCode::A,
+                    key_right: KeyCode::D,
+                    key_up: KeyCode::R,
+                    key_down: KeyCode::F,
+                    key_forward: KeyCode::W,
+                    key_backward: KeyCode::S,
+                },
+                rotation_keys: Keys {
+                    key_left: KeyCode::R,
+                    key_right: KeyCode::F,
+                    key_up: KeyCode::A,
+                    key_down: KeyCode::D,
+                    key_forward: KeyCode::W,
+                    key_backward: KeyCode::S,
+                },
+                enabled: true,
             },
-            rotation_keys: Keys {
-                key_left: KeyCode::R,
-                key_right: KeyCode::F,
-                key_up: KeyCode::A,
-                key_down: KeyCode::D,
-                key_forward: KeyCode::W,
-                key_backward: KeyCode::S,
-            },
-            enabled: true,
             rotational_kinematic_state: KinematicState {
                 acceleration: 0.02,
                 max_speed: 0.4,
@@ -131,10 +139,12 @@ impl Default for PanOrbitCamera {
             },
             linear_kinematic_state: KinematicState {
                 acceleration: 0.2,
-                max_speed: 1.0,
-                friction: 0.1,
+                max_speed: 0.5,
+                friction: 0.15,
                 velocity: Vec3::ZERO,
-            }
+            },
+            camera_position: Vec3::new(0.0, 0.0, 10.0),
+            camera_orientation: Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
         }
     }
 }
@@ -166,36 +176,38 @@ fn get_key_force(is_enabled: bool, keyboard_input: &Res<Input<KeyCode>>, keys: &
     }
 }
 
-fn camera_2d_movement_system(
+fn keyboard_camera_system(
 	time: Res<Time>,
 	keyboard_input: Res<Input<KeyCode>>,
     mut query: Query<(&mut PanOrbitCamera, &mut Transform)>,
 ) {
-	for (mut options, mut transform) in query.iter_mut() {
-        let is_rotation = keyboard_input.pressed(options.key_rotation);
+	for (mut camera, mut transform) in query.iter_mut() {
+        let is_rotation = keyboard_input.pressed(camera.configuration.key_rotation);
         let keys = if is_rotation {
-            &options.rotation_keys
+            &camera.configuration.rotation_keys
         } else {
-            &options.linear_keys
+            &camera.configuration.linear_keys
         };
-        let force = get_key_force(options.enabled, &keyboard_input, &keys);
+        let force = get_key_force(camera.configuration.enabled, &keyboard_input, &keys);
         if is_rotation {
-            options.rotational_kinematic_state.apply_acceleration(&time, force);
+            camera.rotational_kinematic_state.apply_acceleration(&time, force);
         } else {
-            options.linear_kinematic_state.apply_acceleration(&time, force);
+            camera.linear_kinematic_state.apply_acceleration(&time, force);
         }
-        options.rotational_kinematic_state.update_kinematic_state(&time);
-        let rotation = options.rotational_kinematic_state.as_rotation();
-        transform.rotation = transform.rotation * rotation;
-        options.linear_kinematic_state.update_kinematic_state(&time);
-        let translation = options.linear_kinematic_state.as_translation();
-        let rot_matrix = Mat3::from_quat(transform.rotation);
-        transform.translation += rot_matrix.mul_vec3(translation);
+        camera.rotational_kinematic_state.update_kinematic_state(&time);
+        let rotation = camera.rotational_kinematic_state.as_rotation();
+        camera.camera_orientation = camera.camera_orientation * rotation; 
+        camera.linear_kinematic_state.update_kinematic_state(&time);
+        let translation = camera.linear_kinematic_state.as_translation();
+        camera.camera_position += translation;
+        transform.rotation = camera.camera_orientation;
+        let camera_rotation = Mat3::from_quat(camera.camera_orientation);
+        transform.translation = camera_rotation.mul_vec3(camera.camera_position);
 	}
 }
 
 /// Pan the camera with middle mouse click, zoom with scroll wheel, orbit with right mouse click.
-fn pan_orbit_camera(
+fn mouse_camera_system(
     windows: Res<Windows>,
     mut ev_motion: EventReader<MouseMotion>,
     mut ev_scroll: EventReader<MouseWheel>,
@@ -236,9 +248,7 @@ fn pan_orbit_camera(
             pan_orbit.upside_down = up.y <= 0.0;
         }
 
-        let mut any = false;
-        if rotation_move.length_squared() > 0.0 {
-            any = true;
+        let camera_is_updated = if rotation_move.length_squared() > 0.0 {
             let window = get_primary_window_size(&windows);
             let delta_x = {
                 let delta = rotation_move.x / window.x * std::f32::consts::PI * 2.0;
@@ -249,8 +259,8 @@ fn pan_orbit_camera(
             let pitch = Quat::from_rotation_x(-delta_y);
             transform.rotation = yaw * transform.rotation; // rotate around global y axis
             transform.rotation = transform.rotation * pitch; // rotate around local x axis
+            true
         } else if pan.length_squared() > 0.0 {
-            any = true;
             // make panning distance independent of resolution and FOV,
             let window = get_primary_window_size(&windows);
             pan *= Vec2::new(projection.fov * projection.aspect_ratio, projection.fov) / window;
@@ -260,19 +270,22 @@ fn pan_orbit_camera(
             // make panning proportional to distance away from focus point
             let translation = (right + up) * pan_orbit.radius;
             pan_orbit.focus += translation;
+            true
         } else if scroll.abs() > 0.0 {
-            any = true;
-            pan_orbit.radius -= scroll * pan_orbit.radius * 0.2;
+            pan_orbit.camera_position.z -= scroll * pan_orbit.radius * 0.2;
             // dont allow zoom to reach zero or you get stuck
             pan_orbit.radius = f32::max(pan_orbit.radius, 0.05);
-        }
+            true
+        } else {
+            false
+        };
 
-        if any {
+        if camera_is_updated {
             // emulating parent/child to make the yaw/y-axis rotation behave like a turntable
             // parent = x and y rotation
             // child = z-offset
             let rot_matrix = Mat3::from_quat(transform.rotation);
-            transform.translation = rot_matrix.mul_vec3(Vec3::new(0.0, 0.0, pan_orbit.radius));
+            transform.translation = rot_matrix.mul_vec3(pan_orbit.camera_position);
         }
     }
 }
@@ -297,6 +310,7 @@ fn spawn_camera(mut commands: Commands) {
         ..Default::default()
     });
 }
+
 // ANCHOR_END: example
 
 fn spawn_scene(
@@ -323,8 +337,8 @@ fn main() {
     App::build()
         .add_plugins(DefaultPlugins)
         .add_startup_system(spawn_scene.system())
-        .add_system(pan_orbit_camera.system())
-        .add_system(camera_2d_movement_system.system())
+        .add_system(mouse_camera_system.system())
+        .add_system(keyboard_camera_system.system())
         .run();
 
     // just to catch compilation errors
