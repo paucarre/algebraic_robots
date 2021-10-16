@@ -11,14 +11,9 @@ struct PanOrbitCamera {
     pub upside_down: bool,
     //2D
     // The speed the FlyCamera2d accelerates at.
-	pub accel: f32,
 	/// The maximum speed the FlyCamera can move at.
-	pub max_speed: f32,
 	/// The amount of deceleration to apply to the camera's motion.
-	pub friction: f32,
 	/// The current velocity of the FlyCamera2d. This value is always up-to-date, enforced by [FlyCameraPlugin](struct.FlyCameraPlugin.html)
-	pub velocity: Vec3,
-    pub rotational_velocity: Vec3,
 	/// Key used to move left. Defaults to <kbd>A</kbd>
 	pub key_left: KeyCode,
 	/// Key used to move right. Defaults to <kbd>D</kbd>
@@ -32,6 +27,7 @@ struct PanOrbitCamera {
     pub key_forward: KeyCode,
     pub key_backward: KeyCode,
     pub key_rotation: KeyCode,
+    pub linear_kinematic_state: KinematicState,
     pub rotational_kinematic_state: KinematicState,
 }
 
@@ -43,25 +39,18 @@ struct KinematicState {
 }
 
 trait KinematicStateOperations {
-    fn default() -> Self;
     fn compute_acceleration(&self, 
         axis_horizontal: f32, axis_vertical: f32, axis_depth: f32) -> Vec3;
     fn compute_friction(&self) -> Vec3;
     fn compute_velocity(&self, friction: Vec3, time: &Res<Time>) -> Vec3;
-    fn compute_kinematic_state(&mut self, time: &Res<Time>, axis_horizontal: f32, axis_vertical: f32, axis_depth: f32);
+    fn apply_acceleration(&mut self, time: &Res<Time>, axis_horizontal: f32, axis_vertical: f32, axis_depth: f32);
+    fn update_kinematic_state(&mut self, time: &Res<Time>);
     fn as_rotation(&self) -> Quat;
+    fn as_translation(&self) -> Vec3;
 }
 
 impl KinematicStateOperations for KinematicState {
-    
-    fn default() -> KinematicState {
-        KinematicState {
-            acceleration: 0.0,
-            max_speed: 0.0,
-            friction: 0.0,
-            velocity: Vec3::ZERO,
-        }
-    }
+
 
     fn compute_acceleration(&self, 
         axis_horizontal: f32, axis_vertical: f32, axis_depth: f32) -> Vec3 {
@@ -90,18 +79,17 @@ impl KinematicStateOperations for KinematicState {
             self.velocity
         };
         let delta_friction = friction * time.delta_seconds();
-        if (velocity_clamped + delta_friction).signum() != velocity_clamped.signum()
-        {
-            Vec3::ZERO
-        } else {
-            velocity_clamped + delta_friction
-        }
+        let sign_difference = (velocity_clamped.abs() - delta_friction.abs()).signum() / 2.0;
+        (velocity_clamped + delta_friction) * (Vec3::new(0.5, 0.5, 0.5) + sign_difference)
     }
 
-    fn compute_kinematic_state(&mut self, time: &Res<Time>, axis_horizontal: f32, axis_vertical: f32, axis_depth: f32) {
+    fn apply_acceleration(&mut self, time: &Res<Time>, axis_horizontal: f32, axis_vertical: f32, axis_depth: f32) {
         let acceleration = self.compute_acceleration(axis_horizontal, axis_vertical, axis_depth);
-		let friction: Vec3 = self.compute_friction();
 		self.velocity += acceleration * time.delta_seconds();
+    }
+
+    fn update_kinematic_state(&mut self, time: &Res<Time>) {
+		let friction: Vec3 = self.compute_friction();
         self.velocity = self.compute_velocity(friction, &time);
     }
 
@@ -109,7 +97,11 @@ impl KinematicStateOperations for KinematicState {
         let pitch = Quat::from_rotation_x(self.velocity.x);
         let yaw = Quat::from_rotation_y(self.velocity.y);
         let roll = Quat::from_rotation_z(self.velocity.z);
-        pitch * yaw * roll
+        pitch * yaw * roll        
+    }
+
+    fn as_translation(&self) -> Vec3 {
+        Vec3::new(self.velocity.x, self.velocity.y, self.velocity.z)
     }
 }
 
@@ -122,11 +114,6 @@ impl Default for PanOrbitCamera {
             radius: 5.0,
             upside_down: false,
             // Keybaord 3D PAN
-            accel: 0.05 * MUL_2D,
-            max_speed: 5.0 * MUL_2D,
-            friction: 0.03 * MUL_2D,
-            velocity: Vec3::ZERO,
-            rotational_velocity: Vec3::ZERO,
             key_left: KeyCode::A,
             key_right: KeyCode::D,
             key_up: KeyCode::R,
@@ -135,7 +122,18 @@ impl Default for PanOrbitCamera {
             key_backward: KeyCode::S,
             key_rotation: KeyCode::LShift,
             enabled: true,
-            rotational_kinematic_state: KinematicStateOperations::default(),
+            rotational_kinematic_state: KinematicState {
+                acceleration: 0.02,
+                max_speed: 0.4,
+                friction: 0.01,
+                velocity: Vec3::ZERO,
+            },
+            linear_kinematic_state: KinematicState {
+                acceleration: 0.2,
+                max_speed: 1.0,
+                friction: 0.1,
+                velocity: Vec3::ZERO,
+            }
         }
     }
 }
@@ -162,9 +160,6 @@ fn camera_2d_movement_system(
     mut query: Query<(&mut PanOrbitCamera, &mut Transform)>,
 ) {
 	for (mut options, mut transform) in query.iter_mut() {
-        let is_rotation = keyboard_input.pressed(options.key_rotation);
-        //if is_rotation {
-        //} else {
 		let (axis_horizontal, axis_vertical, axis_depth) = if options.enabled {
 			(
 				movement_axis(&keyboard_input, options.key_right, options.key_left),
@@ -175,12 +170,18 @@ fn camera_2d_movement_system(
 			(0.0, 0.0, 0.0)
 		};
 
-        options.rotational_kinematic_state.compute_kinematic_state(&time, axis_horizontal, axis_vertical, axis_depth);
+        if keyboard_input.pressed(options.key_rotation) {
+            options.rotational_kinematic_state.apply_acceleration(&time, axis_horizontal, axis_vertical, axis_depth);
+        } else {
+            options.linear_kinematic_state.apply_acceleration(&time, axis_horizontal, axis_vertical, axis_depth);
+        }
+        options.rotational_kinematic_state.update_kinematic_state(&time);
         let rotation = options.rotational_kinematic_state.as_rotation();
         transform.rotation = transform.rotation * rotation;
-
-		//transform.translation +=
-		//	Vec3::new(options.velocity.x, options.velocity.y, options.velocity.z);
+        options.linear_kinematic_state.update_kinematic_state(&time);
+        let translation = options.linear_kinematic_state.as_translation();
+        let rot_matrix = Mat3::from_quat(transform.rotation);
+        transform.translation += rot_matrix.mul_vec3(translation);
 	}
 }
 
@@ -232,7 +233,7 @@ fn pan_orbit_camera(
             let window = get_primary_window_size(&windows);
             let delta_x = {
                 let delta = rotation_move.x / window.x * std::f32::consts::PI * 2.0;
-                if pan_orbit.upside_down { -delta } else { delta }
+               if pan_orbit.upside_down { -delta } else { delta }
             };
             let delta_y = rotation_move.y / window.y * std::f32::consts::PI;
             let yaw = Quat::from_rotation_y(-delta_x);
@@ -262,7 +263,7 @@ fn pan_orbit_camera(
             // parent = x and y rotation
             // child = z-offset
             let rot_matrix = Mat3::from_quat(transform.rotation);
-            transform.translation = pan_orbit.focus + rot_matrix.mul_vec3(Vec3::new(0.0, 0.0, pan_orbit.radius));
+            transform.translation = rot_matrix.mul_vec3(Vec3::new(0.0, 0.0, pan_orbit.radius));
         }
     }
 }
