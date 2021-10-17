@@ -104,7 +104,6 @@ impl KinematicStateOperations for KinematicState {
 
 impl Default for PanOrbitCamera {
     fn default() -> Self {
-		const MUL_2D: f32 = 10.0;
         PanOrbitCamera {
             // Mouse 3D orbit and pan
             focus: Vec3::ZERO,
