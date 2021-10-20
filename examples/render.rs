@@ -217,19 +217,21 @@ fn keyboard_camera_system(
 
 pub struct RobotDraw {
     pub screw_chain: ScrewChain,
+    pub coordinates : Vec<f64>,
 }
 
 impl Default for RobotDraw {
     fn default() -> Self {
         Self {
-            screw_chain: UniversalRobotsUR5::from_default().unwrap()
+            screw_chain: UniversalRobotsUR5::from_default().unwrap(),
+            coordinates: vec![],
         }
     }
 }
 
 impl RobotDraw {
     pub fn apply_coordinates(&mut self, coordinates : &[f64], duration: f32) {
-      // apply coordinates to the robot
+      self.coordinates = coordinates.to_vec();
     }
 }
 
