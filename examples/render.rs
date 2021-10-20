@@ -235,24 +235,12 @@ impl RobotDraw {
 
 
 fn robot_draw_system(
-    //mut assets: ResMut<Assets<LineShader>>,
-    mut lines: ResMut<RobotDraw>,
+    mut lines: ResMut<DebugLines>,
+    mut robot: ResMut<RobotDraw>,
     time: Res<Time>,
-    //query: Query<&Handle<LineShader>>,
 ) {
-    //let mut len = lines.lines.len();
-    //while i != len {
-        //lines.lines[i].duration -= time.delta_seconds();
-        //if lines.lines[i].duration < 0.0 {
-            //lines.lines.swap(i, len - 1);
-            //len -= 1;
-        //} else {
-            //i += 1;
-        //}
-    //}
-
-    //lines.lines.truncate(len);
-    // do the drawing here
+    let seconds = time.seconds_since_startup() as f32;
+    lines.line_colored(Vec3::new(0.0, 0.0, 0.0), Vec3::new(f32::sin(seconds + 3.14), 1.0, 0.0),  0.0, Color::WHITE);
 }
 
 
