@@ -1,7 +1,12 @@
 use bevy::prelude::*;
 use bevy::input::mouse::{MouseWheel,MouseMotion};
 use bevy::render::camera::PerspectiveProjection;
+use bevy_prototype_debug_lines::*;
+use nalgebra::{ Vector3, Matrix4};
+use algebraic_robots::algebraic_robots::*;
+use algebraic_robots::screw_chains::*;
 
+//UniversalRobotsUR5
 struct PanOrbitCamera {
     /// Mouse
     pub focus: Vec3,
@@ -202,8 +207,32 @@ fn keyboard_camera_system(
         transform.rotation = camera.camera_orientation;
         let camera_rotation = Mat3::from_quat(camera.camera_orientation);
         transform.translation = camera_rotation.mul_vec3(camera.camera_position);
-	}
+ 	}
 }
+
+fn robot_draw_system(time: Res<Time>, mut lines: ResMut<DebugLines>) {
+    let seconds = time.seconds_since_startup() as f32;
+    lines.line_colored(Vec3::new(0.0, 0.0, 0.0), Vec3::new(f32::sin(seconds + 3.14), 1.0, 0.0),  0.0, Color::WHITE);
+}
+
+pub struct RobotDraw {
+    pub screw_chain: ScrewChain,
+}
+
+impl Default for RobotDraw {
+    fn default() -> Self {
+        Self {
+            screw_chain: UniversalRobotsUR5::from_default().unwrap()
+        }
+    }
+}
+
+//impl RobotDraw {
+//    pub fn robot(&mut self, start: Vec3, end: Vec3, duration: f32) {
+//      self.screw_chain = UniversalRobotsUR5;
+//    }
+//}
+
 
 /// Pan the camera with middle mouse click, zoom with scroll wheel, orbit with right mouse click.
 fn mouse_camera_system(
@@ -310,6 +339,9 @@ fn spawn_camera(mut commands: Commands) {
     });
 }
 
+
+
+
 // ANCHOR_END: example
 
 fn spawn_scene(
@@ -335,9 +367,11 @@ fn spawn_scene(
 fn main() {
     App::build()
         .add_plugins(DefaultPlugins)
+        .add_plugin(DebugLinesPlugin)
         .add_startup_system(spawn_scene.system())
         .add_system(mouse_camera_system.system())
         .add_system(keyboard_camera_system.system())
+        .add_system(robot_draw_system.system())        
         .run();
 
     // just to catch compilation errors
