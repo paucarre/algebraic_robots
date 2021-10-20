@@ -210,10 +210,10 @@ fn keyboard_camera_system(
  	}
 }
 
-fn robot_draw_system(time: Res<Time>, mut lines: ResMut<DebugLines>) {
-    let seconds = time.seconds_since_startup() as f32;
-    lines.line_colored(Vec3::new(0.0, 0.0, 0.0), Vec3::new(f32::sin(seconds + 3.14), 1.0, 0.0),  0.0, Color::WHITE);
-}
+//fn robot_draw_system(time: Res<Time>, mut lines: ResMut<DebugLines>) {
+    //let seconds = time.seconds_since_startup() as f32;
+    //lines.line_colored(Vec3::new(0.0, 0.0, 0.0), Vec3::new(f32::sin(seconds + 3.14), 1.0, 0.0),  0.0, Color::WHITE);
+//}
 
 pub struct RobotDraw {
     pub screw_chain: ScrewChain,
@@ -227,11 +227,34 @@ impl Default for RobotDraw {
     }
 }
 
-//impl RobotDraw {
-//    pub fn robot(&mut self, start: Vec3, end: Vec3, duration: f32) {
-//      self.screw_chain = UniversalRobotsUR5;
-//    }
-//}
+impl RobotDraw {
+    pub fn apply_coordinates(&mut self, coordinates : &[f64], duration: f32) {
+      // apply coordinates to the robot
+    }
+}
+
+
+fn robot_draw_system(
+    //mut assets: ResMut<Assets<LineShader>>,
+    mut lines: ResMut<RobotDraw>,
+    time: Res<Time>,
+    //query: Query<&Handle<LineShader>>,
+) {
+    //let mut len = lines.lines.len();
+    //while i != len {
+        //lines.lines[i].duration -= time.delta_seconds();
+        //if lines.lines[i].duration < 0.0 {
+            //lines.lines.swap(i, len - 1);
+            //len -= 1;
+        //} else {
+            //i += 1;
+        //}
+    //}
+
+    //lines.lines.truncate(len);
+    // do the drawing here
+}
+
 
 
 /// Pan the camera with middle mouse click, zoom with scroll wheel, orbit with right mouse click.
@@ -366,12 +389,13 @@ fn spawn_scene(
 
 fn main() {
     App::build()
+        .init_resource::<RobotDraw>()
         .add_plugins(DefaultPlugins)
         .add_plugin(DebugLinesPlugin)
         .add_startup_system(spawn_scene.system())
         .add_system(mouse_camera_system.system())
         .add_system(keyboard_camera_system.system())
-        .add_system(robot_draw_system.system())        
+        .add_system_to_stage(CoreStage::Last, robot_draw_system.system().label("robot_draw"))
         .run();
 
     // just to catch compilation errors
